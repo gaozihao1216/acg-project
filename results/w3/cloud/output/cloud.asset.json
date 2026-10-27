@@ -1,0 +1,203 @@
+{
+  "schema": "object_asset/1",
+  "name": "cloud",
+  "units": {
+    "length": "m",
+    "mass": "kg",
+    "angle": "rad"
+  },
+  "paths_relative_to": ".",
+  "source": {
+    "origin": "points",
+    "path": null,
+    "sha256": null,
+    "weighted": false
+  },
+  "frames": {
+    "source": {
+      "origin": "输入文件的坐标原点",
+      "axes": "输入文件自己的坐标轴"
+    },
+    "body": {
+      "origin": "质心",
+      "axes": "惯量主轴（按主惯量升序 λ1 ≤ λ2 ≤ λ3）"
+    },
+    "source_to_body": {
+      "formula": "p_body = R(rotation) @ (p_source + translation)",
+      "translation": [
+        0.002458094648635721,
+        0.005267084679151224,
+        -0.0012611515884487032
+      ],
+      "rotation_wxyz": [
+        0.809782719180958,
+        -0.23200315495799403,
+        0.5085373635430352,
+        0.17837105618942042
+      ]
+    },
+    "body_to_source": {
+      "formula": "p_source = R(rotation) @ p_body + translation",
+      "translation": [
+        -0.002458094648635721,
+        -0.005267084679151224,
+        0.0012611515884487032
+      ],
+      "rotation_wxyz": [
+        0.809782719180958,
+        0.23200315495799403,
+        -0.5085373635430352,
+        -0.17837105618942042
+      ]
+    }
+  },
+  "mass_properties": {
+    "frame": "source",
+    "mass": 2.0,
+    "volume": null,
+    "density": null,
+    "surface_area": null,
+    "center_of_mass": [
+      -0.002458094648635721,
+      -0.005267084679151224,
+      0.0012611515884487032
+    ],
+    "inertia_com": [
+      [
+        0.3368384223930321,
+        0.0021446096571128117,
+        -0.0034046889631869784
+      ],
+      [
+        0.0021446096571128117,
+        0.3329582952829966,
+        0.0022035628062659135
+      ],
+      [
+        -0.0034046889631869784,
+        0.0022035628062659135,
+        0.3316225532998658
+      ]
+    ],
+    "inertia_products": [
+      0.0021446096571128125,
+      0.0022035628062659135,
+      -0.003404688963186978
+    ],
+    "non_diagonal_ratio": 0.010107780873092607,
+    "correction": {
+      "mode": "none",
+      "weighted": false
+    }
+  },
+  "principal": {
+    "moments": [
+      0.32813517906603573,
+      0.33457673749316674,
+      0.33870735441669264
+    ],
+    "axes_columns": [
+      [
+        0.41914703238913903,
+        0.052919052296487606,
+        -0.9063748336882597
+      ],
+      [
+        -0.5248481433205059,
+        0.8287166048068153,
+        -0.1943275980669823
+      ],
+      [
+        0.740844242531719,
+        0.5571609846548004,
+        0.3751285719404718
+      ]
+    ],
+    "quaternion_wxyz": [
+      0.809782719180958,
+      0.23200315495799403,
+      -0.5085373635430352,
+      -0.17837105618942042
+    ]
+  },
+  "collision": null,
+  "render": {
+    "object_name": "cloud",
+    "mesh": {
+      "path": null,
+      "frame": null
+    },
+    "materials": [
+      {
+        "slot": "body",
+        "base_color": [
+          0.62,
+          0.68,
+          0.78,
+          1.0
+        ],
+        "roughness": 0.45,
+        "metallic": 0.0
+      }
+    ],
+    "ground": {
+      "enabled": true,
+      "size": 8.0
+    },
+    "note": "点云输入没有表面，渲染需要另外提供网格。"
+  },
+  "engine": {
+    "inertia_local": [
+      0.32813517906603573,
+      0.33457673749316674,
+      0.33870735441669264
+    ],
+    "orientation_offset_wxyz": [
+      0.809782719180958,
+      0.23200315495799403,
+      -0.5085373635430352,
+      -0.17837105618942042
+    ],
+    "orientation_formula": "orientation = quat_multiply(spec_orientation, offset)",
+    "ground_z_offset": 0.0,
+    "notes": "引擎内部只存对角惯量；把主轴旋转并进姿态后 I_world = (R·Q)·diag(inertia_local)·(R·Q)ᵀ 依然成立。"
+  },
+  "checks": [
+    {
+      "name": "principal_axes_orthonormal",
+      "ok": true,
+      "detail": "正交误差=6.66e-16，det=+1.000000000000（须为 +1）",
+      "severity": "error"
+    },
+    {
+      "name": "tensor_reconstruction",
+      "ok": true,
+      "detail": "max|QΛQᵀ − I| / 最大对角元 = 1.65e-15",
+      "severity": "error"
+    },
+    {
+      "name": "frame_quaternions_conjugate",
+      "ok": true,
+      "detail": "source_to_body 与 orientation_offset 应互为共轭，差异=0.00e+00",
+      "severity": "error"
+    },
+    {
+      "name": "volume_positive",
+      "ok": false,
+      "detail": "点云无法给出体积：密度与贴地高度都无从计算，仅惯量可用",
+      "severity": "error"
+    },
+    {
+      "name": "diagonal_approximation_safe",
+      "ok": false,
+      "detail": "非对角占比=1.011%（不能用对角近似；主轴旋转已并进姿态，引擎自动处理）",
+      "severity": "info"
+    },
+    {
+      "name": "ground_offset_nonnegative",
+      "ok": true,
+      "detail": "ground_z_offset=+0.000000 m（把物体放到地面上所需的抬升）",
+      "severity": "error"
+    }
+  ]
+}

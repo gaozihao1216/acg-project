@@ -1,0 +1,329 @@
+{
+  "schema": "object_asset/1",
+  "name": "prism",
+  "units": {
+    "length": "m",
+    "mass": "kg",
+    "angle": "rad"
+  },
+  "paths_relative_to": ".",
+  "source": {
+    "origin": "mesh",
+    "path": "../input/prism.obj",
+    "sha256": "871872a50ffbd3aaf4f014a3078e3e8cefd92f7cc7e49c1dc0860bbde607d7ec",
+    "vertices": 6,
+    "faces": 8,
+    "is_closed": true,
+    "is_consistently_oriented": true,
+    "euler_characteristic": 2,
+    "signed_volume": 0.33
+  },
+  "frames": {
+    "source": {
+      "origin": "输入文件的坐标原点",
+      "axes": "输入文件自己的坐标轴"
+    },
+    "body": {
+      "origin": "质心",
+      "axes": "惯量主轴（按主惯量升序 λ1 ≤ λ2 ≤ λ3）"
+    },
+    "source_to_body": {
+      "formula": "p_body = R(rotation) @ (p_source + translation)",
+      "translation": [
+        -0.4666666666666666,
+        -0.3666666666666667,
+        -0.3
+      ],
+      "rotation_wxyz": [
+        0.0,
+        -0.6223319453778704,
+        -0.7827534412330587,
+        0.0
+      ]
+    },
+    "body_to_source": {
+      "formula": "p_source = R(rotation) @ p_body + translation",
+      "translation": [
+        0.4666666666666666,
+        0.3666666666666667,
+        0.3
+      ],
+      "rotation_wxyz": [
+        0.0,
+        0.6223319453778704,
+        0.7827534412330587,
+        0.0
+      ]
+    }
+  },
+  "mass_properties": {
+    "frame": "source",
+    "mass": 3.0,
+    "volume": 0.33,
+    "density": 9.09090909090909,
+    "surface_area": 3.1540798398116783,
+    "center_of_mass": [
+      0.4666666666666666,
+      0.3666666666666667,
+      0.3
+    ],
+    "inertia_com": [
+      [
+        0.2916666666666667,
+        0.01833333333333336,
+        0.0
+      ],
+      [
+        0.01833333333333336,
+        0.21666666666666656,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        0.32833333333333337
+      ]
+    ],
+    "inertia_products": [
+      0.018333333333333392,
+      0.0,
+      0.0
+    ],
+    "non_diagonal_ratio": 0.055837563451776824,
+    "correction": {
+      "mode": "none",
+      "weighted": false
+    }
+  },
+  "principal": {
+    "moments": [
+      0.2124250673787726,
+      0.2959082659545607,
+      0.32833333333333337
+    ],
+    "axes_columns": [
+      [
+        -0.22540589952439075,
+        0.9742649436675839,
+        0.0
+      ],
+      [
+        0.9742649436675839,
+        0.22540589952439075,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        -1.0
+      ]
+    ],
+    "quaternion_wxyz": [
+      0.0,
+      0.6223319453778704,
+      0.7827534412330587,
+      0.0
+    ]
+  },
+  "collision": {
+    "representation": "convex_hull",
+    "frame": "body",
+    "points": [
+      [
+        -0.25204105956673173,
+        -0.537305803537149,
+        0.3000000000000001
+      ],
+      [
+        -0.47744695909112256,
+        0.4369591401304349,
+        0.3000000000000001
+      ],
+      [
+        0.7294880186578543,
+        0.10034666340671428,
+        0.3000000000000001
+      ],
+      [
+        -0.25204105956673173,
+        -0.537305803537149,
+        -0.3000000000000001
+      ],
+      [
+        -0.47744695909112256,
+        0.4369591401304349,
+        -0.3000000000000001
+      ],
+      [
+        0.7294880186578543,
+        0.10034666340671428,
+        -0.3000000000000001
+      ]
+    ],
+    "faces": [
+      [
+        0,
+        1,
+        4,
+        3
+      ],
+      [
+        5,
+        4,
+        1,
+        2
+      ],
+      [
+        5,
+        2,
+        0,
+        3
+      ],
+      [
+        1,
+        0,
+        2
+      ],
+      [
+        4,
+        5,
+        3
+      ]
+    ],
+    "edges": [
+      [
+        0,
+        1
+      ],
+      [
+        1,
+        4
+      ],
+      [
+        3,
+        4
+      ],
+      [
+        0,
+        3
+      ],
+      [
+        4,
+        5
+      ],
+      [
+        1,
+        2
+      ],
+      [
+        2,
+        5
+      ],
+      [
+        0,
+        2
+      ],
+      [
+        3,
+        5
+      ]
+    ],
+    "face_count": 5,
+    "edge_count": 9,
+    "volume": 0.33,
+    "hull_fill_ratio": 1.0,
+    "sat_candidate_axes": 91
+  },
+  "render": {
+    "object_name": "prism",
+    "mesh": {
+      "path": "../input/prism.obj",
+      "frame": "source",
+      "vertices": 6,
+      "faces": 8
+    },
+    "materials": [
+      {
+        "slot": "body",
+        "base_color": [
+          0.62,
+          0.68,
+          0.78,
+          1.0
+        ],
+        "roughness": 0.45,
+        "metallic": 0.0
+      }
+    ],
+    "ground": {
+      "enabled": true,
+      "size": 8.0
+    }
+  },
+  "engine": {
+    "inertia_local": [
+      0.2124250673787726,
+      0.2959082659545607,
+      0.32833333333333337
+    ],
+    "orientation_offset_wxyz": [
+      0.0,
+      0.6223319453778704,
+      0.7827534412330587,
+      0.0
+    ],
+    "orientation_formula": "orientation = quat_multiply(spec_orientation, offset)",
+    "ground_z_offset": 0.3000000000000001,
+    "notes": "引擎内部只存对角惯量；把主轴旋转并进姿态后 I_world = (R·Q)·diag(inertia_local)·(R·Q)ᵀ 依然成立。"
+  },
+  "checks": [
+    {
+      "name": "principal_axes_orthonormal",
+      "ok": true,
+      "detail": "正交误差=2.22e-16，det=+1.000000000000（须为 +1）",
+      "severity": "error"
+    },
+    {
+      "name": "tensor_reconstruction",
+      "ok": true,
+      "detail": "max|QΛQᵀ − I| / 最大对角元 = 3.38e-16",
+      "severity": "error"
+    },
+    {
+      "name": "frame_quaternions_conjugate",
+      "ok": true,
+      "detail": "source_to_body 与 orientation_offset 应互为共轭，差异=0.00e+00",
+      "severity": "error"
+    },
+    {
+      "name": "volume_positive",
+      "ok": true,
+      "detail": "体积=0.330000000 m³",
+      "severity": "error"
+    },
+    {
+      "name": "mesh_closed",
+      "ok": true,
+      "detail": "闭合=True，缠绕一致=True，χ=2",
+      "severity": "error"
+    },
+    {
+      "name": "collision_is_exact",
+      "ok": true,
+      "detail": "凸包/本体 = 1.000000",
+      "severity": "info"
+    },
+    {
+      "name": "diagonal_approximation_safe",
+      "ok": false,
+      "detail": "非对角占比=5.584%（不能用对角近似；主轴旋转已并进姿态，引擎自动处理）",
+      "severity": "info"
+    },
+    {
+      "name": "ground_offset_nonnegative",
+      "ok": true,
+      "detail": "ground_z_offset=+0.300000 m（把物体放到地面上所需的抬升）",
+      "severity": "error"
+    }
+  ]
+}

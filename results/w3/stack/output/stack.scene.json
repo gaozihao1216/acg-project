@@ -1,0 +1,153 @@
+{
+  "schema": "scene_asset/1",
+  "name": "stack",
+  "units": {
+    "length": "m",
+    "mass": "kg",
+    "angle": "rad"
+  },
+  "paths_relative_to": ".",
+  "objects": [
+    {
+      "name": "shell",
+      "asset": "../../shell/output/shell.asset.json",
+      "asset_sha256": "24a4810ec637cd6551881f60067a84844aac632e418ab4b53f78ac693bc07156",
+      "transform": {
+        "position": [
+          0.0,
+          0.0,
+          0.5
+        ],
+        "orientation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      }
+    },
+    {
+      "name": "prism",
+      "asset": "../../prism/output/prism.asset.json",
+      "asset_sha256": "a5fac5228282218d64f8f55073a3054930247e56a36212788333c86b73318a2b",
+      "transform": {
+        "position": [
+          0.0,
+          0.0,
+          1.35
+        ],
+        "orientation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      }
+    }
+  ],
+  "ground": {
+    "enabled": true,
+    "z": 0.0,
+    "friction": 0.8,
+    "restitution": 0.05,
+    "color": [
+      0.22,
+      0.23,
+      0.25
+    ]
+  },
+  "camera": {
+    "position": [
+      3.4,
+      -4.6,
+      2.8
+    ],
+    "target": [
+      0.0,
+      0.0,
+      0.7
+    ],
+    "fov": 42.0
+  },
+  "lights": [
+    {
+      "name": "key",
+      "type": "area",
+      "position": [
+        3.0,
+        -3.5,
+        4.2
+      ],
+      "target": [
+        0.0,
+        0.0,
+        0.5
+      ],
+      "energy": 520.0,
+      "size": 3.0
+    },
+    {
+      "name": "fill",
+      "type": "area",
+      "position": [
+        -3.6,
+        -1.2,
+        2.0
+      ],
+      "target": [
+        0.0,
+        0.0,
+        0.5
+      ],
+      "energy": 180.0,
+      "size": 3.4,
+      "color": [
+        0.82,
+        0.88,
+        1.0
+      ]
+    }
+  ],
+  "simulation": {
+    "enabled": true,
+    "physics_dt": 0.004166666666666667,
+    "substeps": 3,
+    "iterations": 8,
+    "baumgarte": 0.25,
+    "slop": 0.002,
+    "restitution_threshold": 0.6,
+    "gravity": [
+      0.0,
+      0.0,
+      -9.81
+    ],
+    "ground_z": 0.0,
+    "ground_friction": 0.8,
+    "ground_restitution": 0.05,
+    "linear_damping": 0.05,
+    "angular_damping": 1.0,
+    "use_toi_splitting": true,
+    "render_fps": 24,
+    "duration": 2.0
+  },
+  "checks": [
+    {
+      "name": "references_resolved",
+      "ok": true,
+      "severity": "error",
+      "detail": "2 个引用全部可解析"
+    },
+    {
+      "name": "asset_fingerprints_match",
+      "ok": true,
+      "severity": "error",
+      "detail": "物体指纹与场景记录一致"
+    },
+    {
+      "name": "no_inlined_object_data",
+      "ok": true,
+      "severity": "error",
+      "detail": "场景只存引用，未复制物体级数据"
+    }
+  ]
+}

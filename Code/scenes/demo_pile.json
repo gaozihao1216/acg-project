@@ -1,0 +1,1885 @@
+{
+  "name": "demo_pile",
+  "camera": {
+    "position": [
+      2.0,
+      -2.62,
+      3.55
+    ],
+    "target": [
+      0.0,
+      0.0,
+      0.4
+    ],
+    "fov": 46.0
+  },
+  "lights": [
+    {
+      "name": "key",
+      "type": "area",
+      "position": [
+        2.6,
+        -2.4,
+        5.2
+      ],
+      "target": [
+        0.0,
+        0.0,
+        0.9
+      ],
+      "energy": 520.0,
+      "size": 3.4,
+      "color": [
+        1.0,
+        0.96,
+        0.9
+      ]
+    },
+    {
+      "name": "fill",
+      "type": "area",
+      "position": [
+        -3.6,
+        -2.8,
+        2.8
+      ],
+      "target": [
+        0.0,
+        0.0,
+        0.8
+      ],
+      "energy": 160.0,
+      "size": 4.6,
+      "color": [
+        0.86,
+        0.92,
+        1.0
+      ]
+    },
+    {
+      "name": "rim",
+      "type": "area",
+      "position": [
+        0.4,
+        4.2,
+        3.6
+      ],
+      "target": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "energy": 240.0,
+      "size": 3.4,
+      "color": [
+        1.0,
+        1.0,
+        1.0
+      ]
+    }
+  ],
+  "ground": {
+    "enabled": true,
+    "size": 40.0,
+    "color": [
+      0.6,
+      0.6,
+      0.63
+    ],
+    "roughness": 0.58
+  },
+  "objects": [
+    {
+      "name": "wall_x_neg",
+      "geometry": {
+        "type": "box",
+        "size": [
+          0.14,
+          1.98,
+          1.1
+        ]
+      },
+      "transform": {
+        "position": [
+          -0.9199999999999999,
+          0.0,
+          0.55
+        ]
+      },
+      "material": {
+        "name": "mat_wall_x_neg",
+        "base_color": [
+          0.42,
+          0.42,
+          0.45
+        ],
+        "roughness": 0.38,
+        "metallic": 0.0
+      },
+      "mass": 500.0,
+      "physics": {
+        "static": true,
+        "restitution": 0.1,
+        "friction": 0.75
+      }
+    },
+    {
+      "name": "wall_x_pos",
+      "geometry": {
+        "type": "box",
+        "size": [
+          0.14,
+          1.98,
+          1.1
+        ]
+      },
+      "transform": {
+        "position": [
+          0.9199999999999999,
+          0.0,
+          0.55
+        ]
+      },
+      "material": {
+        "name": "mat_wall_x_pos",
+        "base_color": [
+          0.42,
+          0.42,
+          0.45
+        ],
+        "roughness": 0.38,
+        "metallic": 0.0
+      },
+      "mass": 500.0,
+      "physics": {
+        "static": true,
+        "restitution": 0.1,
+        "friction": 0.75
+      }
+    },
+    {
+      "name": "wall_y_neg",
+      "geometry": {
+        "type": "box",
+        "size": [
+          1.7,
+          0.14,
+          1.1
+        ]
+      },
+      "transform": {
+        "position": [
+          0.0,
+          -0.9199999999999999,
+          0.55
+        ]
+      },
+      "material": {
+        "name": "mat_wall_y_neg",
+        "base_color": [
+          0.42,
+          0.42,
+          0.45
+        ],
+        "roughness": 0.38,
+        "metallic": 0.0
+      },
+      "mass": 500.0,
+      "physics": {
+        "static": true,
+        "restitution": 0.1,
+        "friction": 0.75
+      }
+    },
+    {
+      "name": "wall_y_pos",
+      "geometry": {
+        "type": "box",
+        "size": [
+          1.7,
+          0.14,
+          1.1
+        ]
+      },
+      "transform": {
+        "position": [
+          0.0,
+          0.9199999999999999,
+          0.55
+        ]
+      },
+      "material": {
+        "name": "mat_wall_y_pos",
+        "base_color": [
+          0.42,
+          0.42,
+          0.45
+        ],
+        "roughness": 0.38,
+        "metallic": 0.0
+      },
+      "mass": 500.0,
+      "physics": {
+        "static": true,
+        "restitution": 0.1,
+        "friction": 0.75
+      }
+    },
+    {
+      "name": "box_00",
+      "geometry": {
+        "type": "box",
+        "size": [
+          0.2903537567833653,
+          0.2903537567833653,
+          0.2903537567833653
+        ]
+      },
+      "transform": {
+        "position": [
+          0.38194007765811167,
+          0.04610754415337026,
+          2.75735575623172
+        ],
+        "orientation_euler_deg": [
+          -6.650116286093883,
+          -4.639025748921899,
+          18.71991358639513
+        ]
+      },
+      "material": {
+        "name": "mat_box_00",
+        "base_color": [
+          0.16,
+          0.4,
+          0.78
+        ],
+        "roughness": 0.38,
+        "metallic": 0.0
+      },
+      "mass": 20.0,
+      "physics": {
+        "restitution": 0.16,
+        "friction": 0.62
+      }
+    },
+    {
+      "name": "box_01",
+      "geometry": {
+        "type": "box",
+        "size": [
+          0.35504249322795894,
+          0.35504249322795894,
+          0.35504249322795894
+        ]
+      },
+      "transform": {
+        "position": [
+          -0.24534845029824465,
+          -0.2661209540975162,
+          3.419794604130659
+        ],
+        "orientation_euler_deg": [
+          3.8487747128830456,
+          18.71997764524211,
+          -22.838429150240753
+        ]
+      },
+      "material": {
+        "name": "mat_box_01",
+        "base_color": [
+          0.78,
+          0.28,
+          0.2
+        ],
+        "roughness": 0.38,
+        "metallic": 0.0
+      },
+      "mass": 20.0,
+      "physics": {
+        "restitution": 0.16,
+        "friction": 0.62
+      }
+    },
+    {
+      "name": "box_02",
+      "geometry": {
+        "type": "box",
+        "size": [
+          0.3083902871785908,
+          0.3083902871785908,
+          0.3083902871785908
+        ]
+      },
+      "transform": {
+        "position": [
+          -0.48099443497335637,
+          0.493481481342123,
+          3.432929366414665
+        ],
+        "orientation_euler_deg": [
+          -6.183708031532099,
+          -10.419768565274573,
+          22.810027768528975
+        ]
+      },
+      "material": {
+        "name": "mat_box_02",
+        "base_color": [
+          0.2,
+          0.55,
+          0.42
+        ],
+        "roughness": 0.38,
+        "metallic": 0.0
+      },
+      "mass": 20.0,
+      "physics": {
+        "restitution": 0.16,
+        "friction": 0.62
+      }
+    },
+    {
+      "name": "box_03",
+      "geometry": {
+        "type": "box",
+        "size": [
+          0.3452176395018475,
+          0.3452176395018475,
+          0.3452176395018475
+        ]
+      },
+      "transform": {
+        "position": [
+          -0.6047545656420058,
+          -0.6171533323902653,
+          3.9119447610329856
+        ],
+        "orientation_euler_deg": [
+          -11.371384840001902,
+          18.311998951197808,
+          16.186315163316813
+        ]
+      },
+      "material": {
+        "name": "mat_box_03",
+        "base_color": [
+          0.82,
+          0.62,
+          0.22
+        ],
+        "roughness": 0.38,
+        "metallic": 0.0
+      },
+      "mass": 20.0,
+      "physics": {
+        "restitution": 0.16,
+        "friction": 0.62
+      }
+    },
+    {
+      "name": "box_04",
+      "geometry": {
+        "type": "box",
+        "size": [
+          0.3203756287175205,
+          0.3203756287175205,
+          0.3203756287175205
+        ]
+      },
+      "transform": {
+        "position": [
+          0.29031384129914817,
+          0.10711333476491891,
+          3.574325980654967
+        ],
+        "orientation_euler_deg": [
+          -8.918560099028749,
+          12.226403978059842,
+          -9.92803358882352
+        ]
+      },
+      "material": {
+        "name": "mat_box_04",
+        "base_color": [
+          0.5,
+          0.32,
+          0.7
+        ],
+        "roughness": 0.38,
+        "metallic": 0.0
+      },
+      "mass": 20.0,
+      "physics": {
+        "restitution": 0.16,
+        "friction": 0.62
+      }
+    },
+    {
+      "name": "box_05",
+      "geometry": {
+        "type": "box",
+        "size": [
+          0.3447196471864143,
+          0.3447196471864143,
+          0.3447196471864143
+        ]
+      },
+      "transform": {
+        "position": [
+          -0.6294280888699246,
+          0.358969678826104,
+          2.5842349627043513
+        ],
+        "orientation_euler_deg": [
+          21.87967144938669,
+          -13.650140839072877,
+          -20.174086118373268
+        ]
+      },
+      "material": {
+        "name": "mat_box_05",
+        "base_color": [
+          0.72,
+          0.72,
+          0.74
+        ],
+        "roughness": 0.38,
+        "metallic": 0.0
+      },
+      "mass": 20.0,
+      "physics": {
+        "restitution": 0.16,
+        "friction": 0.62
+      }
+    },
+    {
+      "name": "box_06",
+      "geometry": {
+        "type": "box",
+        "size": [
+          0.36135200436286513,
+          0.36135200436286513,
+          0.36135200436286513
+        ]
+      },
+      "transform": {
+        "position": [
+          -0.420464089424801,
+          -0.23955116122121478,
+          2.656654021810912
+        ],
+        "orientation_euler_deg": [
+          -12.20529175331424,
+          0.8488478310781744,
+          16.960881448682223
+        ]
+      },
+      "material": {
+        "name": "mat_box_06",
+        "base_color": [
+          0.86,
+          0.45,
+          0.2
+        ],
+        "roughness": 0.38,
+        "metallic": 0.0
+      },
+      "mass": 20.0,
+      "physics": {
+        "restitution": 0.16,
+        "friction": 0.62
+      }
+    },
+    {
+      "name": "box_07",
+      "geometry": {
+        "type": "box",
+        "size": [
+          0.2625029979552188,
+          0.2625029979552188,
+          0.2625029979552188
+        ]
+      },
+      "transform": {
+        "position": [
+          0.266894357466847,
+          -0.5312883072278012,
+          3.1945441112971937
+        ],
+        "orientation_euler_deg": [
+          21.96456984994613,
+          -10.219325862060636,
+          -12.73310750689291
+        ]
+      },
+      "material": {
+        "name": "mat_box_07",
+        "base_color": [
+          0.16,
+          0.4,
+          0.78
+        ],
+        "roughness": 0.38,
+        "metallic": 0.0
+      },
+      "mass": 20.0,
+      "physics": {
+        "restitution": 0.16,
+        "friction": 0.62
+      }
+    },
+    {
+      "name": "box_08",
+      "geometry": {
+        "type": "box",
+        "size": [
+          0.3286837993498759,
+          0.3286837993498759,
+          0.3286837993498759
+        ]
+      },
+      "transform": {
+        "position": [
+          0.19662205540229583,
+          -0.24442086300191918,
+          4.068190780553705
+        ],
+        "orientation_euler_deg": [
+          -16.89561070792362,
+          -1.898741693216106,
+          2.7157286665338383
+        ]
+      },
+      "material": {
+        "name": "mat_box_08",
+        "base_color": [
+          0.78,
+          0.28,
+          0.2
+        ],
+        "roughness": 0.38,
+        "metallic": 0.0
+      },
+      "mass": 20.0,
+      "physics": {
+        "restitution": 0.16,
+        "friction": 0.62
+      }
+    },
+    {
+      "name": "box_09",
+      "geometry": {
+        "type": "box",
+        "size": [
+          0.3437618057466841,
+          0.3437618057466841,
+          0.3437618057466841
+        ]
+      },
+      "transform": {
+        "position": [
+          0.13217443757358993,
+          -0.5438832826312806,
+          2.64478625785399
+        ],
+        "orientation_euler_deg": [
+          -21.67481399523255,
+          11.98303692470924,
+          -11.846168297088289
+        ]
+      },
+      "material": {
+        "name": "mat_box_09",
+        "base_color": [
+          0.2,
+          0.55,
+          0.42
+        ],
+        "roughness": 0.38,
+        "metallic": 0.0
+      },
+      "mass": 20.0,
+      "physics": {
+        "restitution": 0.16,
+        "friction": 0.62
+      }
+    },
+    {
+      "name": "box_10",
+      "geometry": {
+        "type": "box",
+        "size": [
+          0.34192618287177656,
+          0.34192618287177656,
+          0.34192618287177656
+        ]
+      },
+      "transform": {
+        "position": [
+          -0.35559078197946037,
+          0.49677662790389676,
+          4.063844567197791
+        ],
+        "orientation_euler_deg": [
+          -1.539274505215289,
+          -8.107730045549939,
+          16.044895577682148
+        ]
+      },
+      "material": {
+        "name": "mat_box_10",
+        "base_color": [
+          0.82,
+          0.62,
+          0.22
+        ],
+        "roughness": 0.38,
+        "metallic": 0.0
+      },
+      "mass": 20.0,
+      "physics": {
+        "restitution": 0.16,
+        "friction": 0.62
+      }
+    },
+    {
+      "name": "box_11",
+      "geometry": {
+        "type": "box",
+        "size": [
+          0.3691552460585298,
+          0.3691552460585298,
+          0.3691552460585298
+        ]
+      },
+      "transform": {
+        "position": [
+          0.3383872755156555,
+          0.6131573539283206,
+          3.000831452651017
+        ],
+        "orientation_euler_deg": [
+          -9.897690829661588,
+          14.793516072240884,
+          13.967710419401143
+        ]
+      },
+      "material": {
+        "name": "mat_box_11",
+        "base_color": [
+          0.5,
+          0.32,
+          0.7
+        ],
+        "roughness": 0.38,
+        "metallic": 0.0
+      },
+      "mass": 20.0,
+      "physics": {
+        "restitution": 0.16,
+        "friction": 0.62
+      }
+    },
+    {
+      "name": "sphere_00",
+      "geometry": {
+        "type": "sphere",
+        "radius": 0.11958561329159044
+      },
+      "transform": {
+        "position": [
+          -0.4884401498801868,
+          0.652507765041327,
+          2.9908658729446316
+        ]
+      },
+      "material": {
+        "name": "mat_sphere_00",
+        "base_color": [
+          0.16,
+          0.4,
+          0.78
+        ],
+        "roughness": 0.38,
+        "metallic": 0.0
+      },
+      "mass": 20.0,
+      "physics": {
+        "restitution": 0.16,
+        "friction": 0.62
+      }
+    },
+    {
+      "name": "sphere_01",
+      "geometry": {
+        "type": "sphere",
+        "radius": 0.11479385622498209
+      },
+      "transform": {
+        "position": [
+          -0.015817635818485054,
+          0.7006184558041888,
+          3.512360661379206
+        ]
+      },
+      "material": {
+        "name": "mat_sphere_01",
+        "base_color": [
+          0.78,
+          0.28,
+          0.2
+        ],
+        "roughness": 0.38,
+        "metallic": 0.0
+      },
+      "mass": 20.0,
+      "physics": {
+        "restitution": 0.16,
+        "friction": 0.62
+      }
+    },
+    {
+      "name": "sphere_02",
+      "geometry": {
+        "type": "sphere",
+        "radius": 0.16325383640536542
+      },
+      "transform": {
+        "position": [
+          -0.19254900700566469,
+          0.20179316467237052,
+          2.4967408330744965
+        ]
+      },
+      "material": {
+        "name": "mat_sphere_02",
+        "base_color": [
+          0.2,
+          0.55,
+          0.42
+        ],
+        "roughness": 0.38,
+        "metallic": 0.0
+      },
+      "mass": 20.0,
+      "physics": {
+        "restitution": 0.16,
+        "friction": 0.62
+      }
+    },
+    {
+      "name": "sphere_03",
+      "geometry": {
+        "type": "sphere",
+        "radius": 0.11363472519336473
+      },
+      "transform": {
+        "position": [
+          -0.5120467074229204,
+          -0.013790591783460537,
+          3.1561757056318878
+        ]
+      },
+      "material": {
+        "name": "mat_sphere_03",
+        "base_color": [
+          0.82,
+          0.62,
+          0.22
+        ],
+        "roughness": 0.38,
+        "metallic": 0.0
+      },
+      "mass": 20.0,
+      "physics": {
+        "restitution": 0.16,
+        "friction": 0.62
+      }
+    },
+    {
+      "name": "sphere_04",
+      "geometry": {
+        "type": "sphere",
+        "radius": 0.1273240789087821
+      },
+      "transform": {
+        "position": [
+          -0.3429196266438222,
+          0.1851045570221983,
+          3.1618481309226296
+        ]
+      },
+      "material": {
+        "name": "mat_sphere_04",
+        "base_color": [
+          0.5,
+          0.32,
+          0.7
+        ],
+        "roughness": 0.38,
+        "metallic": 0.0
+      },
+      "mass": 20.0,
+      "physics": {
+        "restitution": 0.16,
+        "friction": 0.62
+      }
+    },
+    {
+      "name": "sphere_05",
+      "geometry": {
+        "type": "sphere",
+        "radius": 0.1302241007287787
+      },
+      "transform": {
+        "position": [
+          0.3856046662003212,
+          0.37261005267369396,
+          4.177664302055662
+        ]
+      },
+      "material": {
+        "name": "mat_sphere_05",
+        "base_color": [
+          0.72,
+          0.72,
+          0.74
+        ],
+        "roughness": 0.38,
+        "metallic": 0.0
+      },
+      "mass": 20.0,
+      "physics": {
+        "restitution": 0.16,
+        "friction": 0.62
+      }
+    },
+    {
+      "name": "sphere_06",
+      "geometry": {
+        "type": "sphere",
+        "radius": 0.1684478616885141
+      },
+      "transform": {
+        "position": [
+          -0.6239281010120798,
+          0.03238918312916439,
+          3.558629285478867
+        ]
+      },
+      "material": {
+        "name": "mat_sphere_06",
+        "base_color": [
+          0.86,
+          0.45,
+          0.2
+        ],
+        "roughness": 0.38,
+        "metallic": 0.0
+      },
+      "mass": 20.0,
+      "physics": {
+        "restitution": 0.16,
+        "friction": 0.62
+      }
+    },
+    {
+      "name": "sphere_07",
+      "geometry": {
+        "type": "sphere",
+        "radius": 0.111219979133963
+      },
+      "transform": {
+        "position": [
+          0.64642774015964,
+          0.6935287726742841,
+          2.370200296623878
+        ]
+      },
+      "material": {
+        "name": "mat_sphere_07",
+        "base_color": [
+          0.16,
+          0.4,
+          0.78
+        ],
+        "roughness": 0.38,
+        "metallic": 0.0
+      },
+      "mass": 20.0,
+      "physics": {
+        "restitution": 0.16,
+        "friction": 0.62
+      }
+    },
+    {
+      "name": "sphere_08",
+      "geometry": {
+        "type": "sphere",
+        "radius": 0.13099643226506574
+      },
+      "transform": {
+        "position": [
+          0.10946631451947919,
+          0.3896238287341731,
+          2.5445571615867677
+        ]
+      },
+      "material": {
+        "name": "mat_sphere_08",
+        "base_color": [
+          0.78,
+          0.28,
+          0.2
+        ],
+        "roughness": 0.38,
+        "metallic": 0.0
+      },
+      "mass": 20.0,
+      "physics": {
+        "restitution": 0.16,
+        "friction": 0.62
+      }
+    },
+    {
+      "name": "sphere_09",
+      "geometry": {
+        "type": "sphere",
+        "radius": 0.1378316308698038
+      },
+      "transform": {
+        "position": [
+          0.6864204921062914,
+          -0.58730475250151,
+          2.6686050065911338
+        ]
+      },
+      "material": {
+        "name": "mat_sphere_09",
+        "base_color": [
+          0.2,
+          0.55,
+          0.42
+        ],
+        "roughness": 0.38,
+        "metallic": 0.0
+      },
+      "mass": 20.0,
+      "physics": {
+        "restitution": 0.16,
+        "friction": 0.62
+      }
+    },
+    {
+      "name": "sphere_10",
+      "geometry": {
+        "type": "sphere",
+        "radius": 0.1206119889205669
+      },
+      "transform": {
+        "position": [
+          0.6072795227570578,
+          -0.5008162222866663,
+          4.114915931823282
+        ]
+      },
+      "material": {
+        "name": "mat_sphere_10",
+        "base_color": [
+          0.82,
+          0.62,
+          0.22
+        ],
+        "roughness": 0.38,
+        "metallic": 0.0
+      },
+      "mass": 20.0,
+      "physics": {
+        "restitution": 0.16,
+        "friction": 0.62
+      }
+    },
+    {
+      "name": "sphere_11",
+      "geometry": {
+        "type": "sphere",
+        "radius": 0.11468389917507033
+      },
+      "transform": {
+        "position": [
+          -0.2418076739163732,
+          -0.1261262338245852,
+          4.166267205397767
+        ]
+      },
+      "material": {
+        "name": "mat_sphere_11",
+        "base_color": [
+          0.5,
+          0.32,
+          0.7
+        ],
+        "roughness": 0.38,
+        "metallic": 0.0
+      },
+      "mass": 20.0,
+      "physics": {
+        "restitution": 0.16,
+        "friction": 0.62
+      }
+    },
+    {
+      "name": "sphere_12",
+      "geometry": {
+        "type": "sphere",
+        "radius": 0.11359912639838723
+      },
+      "transform": {
+        "position": [
+          0.7031848764525113,
+          -0.20337681463558355,
+          2.5500661139234344
+        ]
+      },
+      "material": {
+        "name": "mat_sphere_12",
+        "base_color": [
+          0.72,
+          0.72,
+          0.74
+        ],
+        "roughness": 0.38,
+        "metallic": 0.0
+      },
+      "mass": 20.0,
+      "physics": {
+        "restitution": 0.16,
+        "friction": 0.62
+      }
+    },
+    {
+      "name": "sphere_13",
+      "geometry": {
+        "type": "sphere",
+        "radius": 0.11583485330794577
+      },
+      "transform": {
+        "position": [
+          0.30091597945283244,
+          0.24209761975598276,
+          2.320837191705184
+        ]
+      },
+      "material": {
+        "name": "mat_sphere_13",
+        "base_color": [
+          0.86,
+          0.45,
+          0.2
+        ],
+        "roughness": 0.38,
+        "metallic": 0.0
+      },
+      "mass": 20.0,
+      "physics": {
+        "restitution": 0.16,
+        "friction": 0.62
+      }
+    },
+    {
+      "name": "sphere_14",
+      "geometry": {
+        "type": "sphere",
+        "radius": 0.12585690704860644
+      },
+      "transform": {
+        "position": [
+          0.6013052921624206,
+          -0.2705282121257608,
+          3.8907401711939658
+        ]
+      },
+      "material": {
+        "name": "mat_sphere_14",
+        "base_color": [
+          0.16,
+          0.4,
+          0.78
+        ],
+        "roughness": 0.38,
+        "metallic": 0.0
+      },
+      "mass": 20.0,
+      "physics": {
+        "restitution": 0.16,
+        "friction": 0.62
+      }
+    },
+    {
+      "name": "sphere_15",
+      "geometry": {
+        "type": "sphere",
+        "radius": 0.18640829356143668
+      },
+      "transform": {
+        "position": [
+          -0.1749089090211538,
+          0.620217693946769,
+          2.746526307904529
+        ]
+      },
+      "material": {
+        "name": "mat_sphere_15",
+        "base_color": [
+          0.78,
+          0.28,
+          0.2
+        ],
+        "roughness": 0.38,
+        "metallic": 0.0
+      },
+      "mass": 20.0,
+      "physics": {
+        "restitution": 0.16,
+        "friction": 0.62
+      }
+    },
+    {
+      "name": "sphere_16",
+      "geometry": {
+        "type": "sphere",
+        "radius": 0.1192160395932513
+      },
+      "transform": {
+        "position": [
+          0.583543403915579,
+          0.6430589767214446,
+          4.175737730149583
+        ]
+      },
+      "material": {
+        "name": "mat_sphere_16",
+        "base_color": [
+          0.2,
+          0.55,
+          0.42
+        ],
+        "roughness": 0.38,
+        "metallic": 0.0
+      },
+      "mass": 20.0,
+      "physics": {
+        "restitution": 0.16,
+        "friction": 0.62
+      }
+    },
+    {
+      "name": "sphere_17",
+      "geometry": {
+        "type": "sphere",
+        "radius": 0.17222283384526496
+      },
+      "transform": {
+        "position": [
+          0.11799697241508578,
+          0.6117232122210018,
+          4.160437871139831
+        ]
+      },
+      "material": {
+        "name": "mat_sphere_17",
+        "base_color": [
+          0.82,
+          0.62,
+          0.22
+        ],
+        "roughness": 0.38,
+        "metallic": 0.0
+      },
+      "mass": 20.0,
+      "physics": {
+        "restitution": 0.16,
+        "friction": 0.62
+      }
+    },
+    {
+      "name": "sphere_18",
+      "geometry": {
+        "type": "sphere",
+        "radius": 0.1571547925594663
+      },
+      "transform": {
+        "position": [
+          0.14833338770257765,
+          0.23215501258223237,
+          4.057432419564562
+        ]
+      },
+      "material": {
+        "name": "mat_sphere_18",
+        "base_color": [
+          0.5,
+          0.32,
+          0.7
+        ],
+        "roughness": 0.38,
+        "metallic": 0.0
+      },
+      "mass": 20.0,
+      "physics": {
+        "restitution": 0.16,
+        "friction": 0.62
+      }
+    },
+    {
+      "name": "sphere_19",
+      "geometry": {
+        "type": "sphere",
+        "radius": 0.13285454579877784
+      },
+      "transform": {
+        "position": [
+          0.6404353523978537,
+          -0.372832441549121,
+          3.6003531900472296
+        ]
+      },
+      "material": {
+        "name": "mat_sphere_19",
+        "base_color": [
+          0.72,
+          0.72,
+          0.74
+        ],
+        "roughness": 0.38,
+        "metallic": 0.0
+      },
+      "mass": 20.0,
+      "physics": {
+        "restitution": 0.16,
+        "friction": 0.62
+      }
+    },
+    {
+      "name": "sphere_20",
+      "geometry": {
+        "type": "sphere",
+        "radius": 0.1364224229575885
+      },
+      "transform": {
+        "position": [
+          0.5898037913631047,
+          -0.344158685771808,
+          3.0622575723136887
+        ]
+      },
+      "material": {
+        "name": "mat_sphere_20",
+        "base_color": [
+          0.86,
+          0.45,
+          0.2
+        ],
+        "roughness": 0.38,
+        "metallic": 0.0
+      },
+      "mass": 20.0,
+      "physics": {
+        "restitution": 0.16,
+        "friction": 0.62
+      }
+    },
+    {
+      "name": "sphere_21",
+      "geometry": {
+        "type": "sphere",
+        "radius": 0.13873988038135418
+      },
+      "transform": {
+        "position": [
+          -0.6204710230248162,
+          -0.4276475877177264,
+          3.058161560083684
+        ]
+      },
+      "material": {
+        "name": "mat_sphere_21",
+        "base_color": [
+          0.16,
+          0.4,
+          0.78
+        ],
+        "roughness": 0.38,
+        "metallic": 0.0
+      },
+      "mass": 20.0,
+      "physics": {
+        "restitution": 0.16,
+        "friction": 0.62
+      }
+    },
+    {
+      "name": "sphere_22",
+      "geometry": {
+        "type": "sphere",
+        "radius": 0.12471233407858785
+      },
+      "transform": {
+        "position": [
+          -0.11215365206399741,
+          0.18648200723022657,
+          3.0314295243347003
+        ]
+      },
+      "material": {
+        "name": "mat_sphere_22",
+        "base_color": [
+          0.78,
+          0.28,
+          0.2
+        ],
+        "roughness": 0.38,
+        "metallic": 0.0
+      },
+      "mass": 20.0,
+      "physics": {
+        "restitution": 0.16,
+        "friction": 0.62
+      }
+    },
+    {
+      "name": "sphere_23",
+      "geometry": {
+        "type": "sphere",
+        "radius": 0.13214068843456178
+      },
+      "transform": {
+        "position": [
+          0.6188791945510779,
+          0.2155100605469752,
+          3.114646669897871
+        ]
+      },
+      "material": {
+        "name": "mat_sphere_23",
+        "base_color": [
+          0.2,
+          0.55,
+          0.42
+        ],
+        "roughness": 0.38,
+        "metallic": 0.0
+      },
+      "mass": 20.0,
+      "physics": {
+        "restitution": 0.16,
+        "friction": 0.62
+      }
+    },
+    {
+      "name": "sphere_24",
+      "geometry": {
+        "type": "sphere",
+        "radius": 0.11453667592666002
+      },
+      "transform": {
+        "position": [
+          -0.5820168877739541,
+          0.06657154376899999,
+          4.178993086294215
+        ]
+      },
+      "material": {
+        "name": "mat_sphere_24",
+        "base_color": [
+          0.82,
+          0.62,
+          0.22
+        ],
+        "roughness": 0.38,
+        "metallic": 0.0
+      },
+      "mass": 20.0,
+      "physics": {
+        "restitution": 0.16,
+        "friction": 0.62
+      }
+    },
+    {
+      "name": "sphere_25",
+      "geometry": {
+        "type": "sphere",
+        "radius": 0.1804222568799354
+      },
+      "transform": {
+        "position": [
+          0.5352466808439845,
+          -0.6283899779537886,
+          3.790946213070371
+        ]
+      },
+      "material": {
+        "name": "mat_sphere_25",
+        "base_color": [
+          0.5,
+          0.32,
+          0.7
+        ],
+        "roughness": 0.38,
+        "metallic": 0.0
+      },
+      "mass": 20.0,
+      "physics": {
+        "restitution": 0.16,
+        "friction": 0.62
+      }
+    },
+    {
+      "name": "sphere_26",
+      "geometry": {
+        "type": "sphere",
+        "radius": 0.18555108537398057
+      },
+      "transform": {
+        "position": [
+          0.6336266300721701,
+          0.216652986516102,
+          2.39455352940713
+        ]
+      },
+      "material": {
+        "name": "mat_sphere_26",
+        "base_color": [
+          0.72,
+          0.72,
+          0.74
+        ],
+        "roughness": 0.38,
+        "metallic": 0.0
+      },
+      "mass": 20.0,
+      "physics": {
+        "restitution": 0.16,
+        "friction": 0.62
+      }
+    },
+    {
+      "name": "sphere_27",
+      "geometry": {
+        "type": "sphere",
+        "radius": 0.12458376287745097
+      },
+      "transform": {
+        "position": [
+          -0.46412345804122257,
+          -0.653831975884615,
+          3.1638008788559557
+        ]
+      },
+      "material": {
+        "name": "mat_sphere_27",
+        "base_color": [
+          0.86,
+          0.45,
+          0.2
+        ],
+        "roughness": 0.38,
+        "metallic": 0.0
+      },
+      "mass": 20.0,
+      "physics": {
+        "restitution": 0.16,
+        "friction": 0.62
+      }
+    },
+    {
+      "name": "sphere_28",
+      "geometry": {
+        "type": "sphere",
+        "radius": 0.1309336733787683
+      },
+      "transform": {
+        "position": [
+          0.1459039029521665,
+          -0.08364203230715117,
+          2.3718989904734262
+        ]
+      },
+      "material": {
+        "name": "mat_sphere_28",
+        "base_color": [
+          0.16,
+          0.4,
+          0.78
+        ],
+        "roughness": 0.38,
+        "metallic": 0.0
+      },
+      "mass": 20.0,
+      "physics": {
+        "restitution": 0.16,
+        "friction": 0.62
+      }
+    },
+    {
+      "name": "sphere_29",
+      "geometry": {
+        "type": "sphere",
+        "radius": 0.11278239469623372
+      },
+      "transform": {
+        "position": [
+          0.23148595195521138,
+          0.1429462075164356,
+          3.149673185207417
+        ]
+      },
+      "material": {
+        "name": "mat_sphere_29",
+        "base_color": [
+          0.78,
+          0.28,
+          0.2
+        ],
+        "roughness": 0.38,
+        "metallic": 0.0
+      },
+      "mass": 20.0,
+      "physics": {
+        "restitution": 0.16,
+        "friction": 0.62
+      }
+    },
+    {
+      "name": "sphere_30",
+      "geometry": {
+        "type": "sphere",
+        "radius": 0.11967753774672643
+      },
+      "transform": {
+        "position": [
+          0.2470231286455492,
+          0.6028324113401036,
+          3.4858532493224974
+        ]
+      },
+      "material": {
+        "name": "mat_sphere_30",
+        "base_color": [
+          0.2,
+          0.55,
+          0.42
+        ],
+        "roughness": 0.38,
+        "metallic": 0.0
+      },
+      "mass": 20.0,
+      "physics": {
+        "restitution": 0.16,
+        "friction": 0.62
+      }
+    },
+    {
+      "name": "sphere_31",
+      "geometry": {
+        "type": "sphere",
+        "radius": 0.1529314393249286
+      },
+      "transform": {
+        "position": [
+          0.6247966275321369,
+          0.5044291563463755,
+          3.701171080513176
+        ]
+      },
+      "material": {
+        "name": "mat_sphere_31",
+        "base_color": [
+          0.82,
+          0.62,
+          0.22
+        ],
+        "roughness": 0.38,
+        "metallic": 0.0
+      },
+      "mass": 20.0,
+      "physics": {
+        "restitution": 0.16,
+        "friction": 0.62
+      }
+    },
+    {
+      "name": "sphere_32",
+      "geometry": {
+        "type": "sphere",
+        "radius": 0.1606675999456081
+      },
+      "transform": {
+        "position": [
+          -0.01971005584642238,
+          -0.6042847103058682,
+          3.778076189742495
+        ]
+      },
+      "material": {
+        "name": "mat_sphere_32",
+        "base_color": [
+          0.5,
+          0.32,
+          0.7
+        ],
+        "roughness": 0.38,
+        "metallic": 0.0
+      },
+      "mass": 20.0,
+      "physics": {
+        "restitution": 0.16,
+        "friction": 0.62
+      }
+    },
+    {
+      "name": "sphere_33",
+      "geometry": {
+        "type": "sphere",
+        "radius": 0.14501583423408476
+      },
+      "transform": {
+        "position": [
+          0.6836589683368888,
+          -0.20304068716845136,
+          3.3589593156416875
+        ]
+      },
+      "material": {
+        "name": "mat_sphere_33",
+        "base_color": [
+          0.72,
+          0.72,
+          0.74
+        ],
+        "roughness": 0.38,
+        "metallic": 0.0
+      },
+      "mass": 20.0,
+      "physics": {
+        "restitution": 0.16,
+        "friction": 0.62
+      }
+    },
+    {
+      "name": "sphere_34",
+      "geometry": {
+        "type": "sphere",
+        "radius": 0.12386821774920097
+      },
+      "transform": {
+        "position": [
+          0.2578169592468422,
+          -0.49770607770709974,
+          3.6543511483445634
+        ]
+      },
+      "material": {
+        "name": "mat_sphere_34",
+        "base_color": [
+          0.86,
+          0.45,
+          0.2
+        ],
+        "roughness": 0.38,
+        "metallic": 0.0
+      },
+      "mass": 20.0,
+      "physics": {
+        "restitution": 0.16,
+        "friction": 0.62
+      }
+    },
+    {
+      "name": "sphere_35",
+      "geometry": {
+        "type": "sphere",
+        "radius": 0.14965339744978592
+      },
+      "transform": {
+        "position": [
+          -0.19296075216185526,
+          0.5247704182905761,
+          2.3200634494145764
+        ]
+      },
+      "material": {
+        "name": "mat_sphere_35",
+        "base_color": [
+          0.16,
+          0.4,
+          0.78
+        ],
+        "roughness": 0.38,
+        "metallic": 0.0
+      },
+      "mass": 20.0,
+      "physics": {
+        "restitution": 0.16,
+        "friction": 0.62
+      }
+    },
+    {
+      "name": "sphere_36",
+      "geometry": {
+        "type": "sphere",
+        "radius": 0.1443877646019428
+      },
+      "transform": {
+        "position": [
+          0.2081890184377393,
+          0.5100848372301101,
+          3.7624395198297127
+        ]
+      },
+      "material": {
+        "name": "mat_sphere_36",
+        "base_color": [
+          0.78,
+          0.28,
+          0.2
+        ],
+        "roughness": 0.38,
+        "metallic": 0.0
+      },
+      "mass": 20.0,
+      "physics": {
+        "restitution": 0.16,
+        "friction": 0.62
+      }
+    },
+    {
+      "name": "sphere_37",
+      "geometry": {
+        "type": "sphere",
+        "radius": 0.11816896910019813
+      },
+      "transform": {
+        "position": [
+          0.6908609211791569,
+          0.059470615126773096,
+          3.7895370375828072
+        ]
+      },
+      "material": {
+        "name": "mat_sphere_37",
+        "base_color": [
+          0.2,
+          0.55,
+          0.42
+        ],
+        "roughness": 0.38,
+        "metallic": 0.0
+      },
+      "mass": 20.0,
+      "physics": {
+        "restitution": 0.16,
+        "friction": 0.62
+      }
+    },
+    {
+      "name": "sphere_38",
+      "geometry": {
+        "type": "sphere",
+        "radius": 0.1161499538239395
+      },
+      "transform": {
+        "position": [
+          -0.0284762281940788,
+          0.37422715247947536,
+          3.7768873180329354
+        ]
+      },
+      "material": {
+        "name": "mat_sphere_38",
+        "base_color": [
+          0.82,
+          0.62,
+          0.22
+        ],
+        "roughness": 0.38,
+        "metallic": 0.0
+      },
+      "mass": 20.0,
+      "physics": {
+        "restitution": 0.16,
+        "friction": 0.62
+      }
+    },
+    {
+      "name": "sphere_39",
+      "geometry": {
+        "type": "sphere",
+        "radius": 0.1462783549354657
+      },
+      "transform": {
+        "position": [
+          -0.35463903126297175,
+          -0.028102339459594283,
+          3.8780286335385896
+        ]
+      },
+      "material": {
+        "name": "mat_sphere_39",
+        "base_color": [
+          0.5,
+          0.32,
+          0.7
+        ],
+        "roughness": 0.38,
+        "metallic": 0.0
+      },
+      "mass": 20.0,
+      "physics": {
+        "restitution": 0.16,
+        "friction": 0.62
+      }
+    }
+  ],
+  "simulation": {
+    "enabled": true,
+    "physics_dt": 0.004166666666666667,
+    "substeps": 3,
+    "iterations": 8,
+    "baumgarte": 0.25,
+    "slop": 0.002,
+    "restitution_threshold": 0.6,
+    "gravity": [
+      0.0,
+      0.0,
+      -9.81
+    ],
+    "ground_z": 0.0,
+    "ground_friction": 0.72,
+    "ground_restitution": 0.05,
+    "linear_damping": 0.05,
+    "angular_damping": 1.0,
+    "use_toi_splitting": true,
+    "broadphase": "spatial_hash",
+    "render_fps": 24,
+    "duration": 2.4
+  },
+  "render": {
+    "resolution": [
+      960,
+      540
+    ],
+    "samples": 40,
+    "engine": "CYCLES",
+    "denoise": true,
+    "world_color": [
+      0.055,
+      0.058,
+      0.07
+    ],
+    "world_strength": 0.32,
+    "exposure": 0.0,
+    "film_transparent": false
+  }
+}

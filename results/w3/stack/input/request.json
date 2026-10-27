@@ -1,0 +1,35 @@
+{
+  "schema": "scene_request/1",
+  "name": "stack",
+  "command": [
+    "assemble_scene.py",
+    "--root",
+    "results\\w3",
+    "--name",
+    "stack",
+    "--place=shell=0.0,0.0,0.0",
+    "--place=prism=0.0,0.0,1.05",
+    "--emit-engine",
+    "results\\w3\\stack\\output\\stack.engine.json"
+  ],
+  "objects": [
+    {
+      "name": "shell",
+      "position": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "name": "prism",
+      "position": [
+        0.0,
+        0.0,
+        1.05
+      ]
+    }
+  ],
+  "duration": 2.0,
+  "note": "场景资产只存引用；物体级数值得去 <name>/output/<name>.asset.json 读。"
+}

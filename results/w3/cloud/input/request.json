@@ -1,0 +1,41 @@
+{
+  "schema": "case_request/1",
+  "name": "cloud",
+  "command": [
+    "analyze_object.py",
+    "--points",
+    "random:4000:7:1,1,1",
+    "--mass",
+    "2.0",
+    "--name",
+    "cloud",
+    "--out-dir",
+    "results\\w3"
+  ],
+  "inputs": {
+    "source": null,
+    "points": {
+      "mode": "random",
+      "count": 4000,
+      "seed": 7,
+      "bounds": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "generator": "uniform_in_box"
+    }
+  },
+  "mass_spec": {
+    "mass": 2.0,
+    "density": null,
+    "rule": "mass 直接给定"
+  },
+  "geometry_spec": {
+    "max_faces": 64
+  },
+  "correction_spec": {
+    "requested": "auto",
+    "note": "点云专用。资产里的 correction.mode 是**最终决定**——auto 可能判定为不应修正。"
+  }
+}

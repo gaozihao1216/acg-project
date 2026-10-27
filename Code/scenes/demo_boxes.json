@@ -1,0 +1,119 @@
+{
+  "name": "demo_boxes",
+  "camera": {
+    "position": [3.9, -5.0, 2.35],
+    "target": [-0.05, 0.0, 0.55],
+    "fov": 42.0
+  },
+  "lights": [
+    {
+      "name": "key",
+      "type": "area",
+      "position": [3.2, -3.0, 4.8],
+      "target": [0.0, 0.0, 0.7],
+      "energy": 380.0,
+      "size": 2.8,
+      "color": [1.0, 0.96, 0.92]
+    },
+    {
+      "name": "fill",
+      "type": "area",
+      "position": [-4.0, -2.2, 2.4],
+      "target": [0.0, 0.0, 0.5],
+      "energy": 110.0,
+      "size": 4.2,
+      "color": [0.88, 0.93, 1.0]
+    },
+    {
+      "name": "rim",
+      "type": "area",
+      "position": [0.8, 4.6, 3.4],
+      "target": [0.0, 0.0, 0.6],
+      "energy": 210.0,
+      "size": 3.0,
+      "color": [1.0, 1.0, 1.0]
+    }
+  ],
+  "ground": {
+    "enabled": true,
+    "size": 40.0,
+    "color": [0.62, 0.62, 0.64],
+    "roughness": 0.55
+  },
+  "objects": [
+    {
+      "name": "falling_box",
+      "geometry": { "type": "box", "size": [0.70, 0.70, 0.70] },
+      "transform": {
+        "position": [-1.55, 0.62, 1.15],
+        "orientation_euler_deg": [0.0, 24.0, 0.0]
+      },
+      "material": {
+        "name": "mat_falling_box",
+        "base_color": [0.16, 0.40, 0.78],
+        "roughness": 0.42,
+        "metallic": 0.0
+      },
+      "mass": 90.0,
+      "physics": { "restitution": 0.10, "friction": 0.75 }
+    },
+    {
+      "name": "target_box",
+      "geometry": { "type": "box", "size": [0.70, 0.60, 0.70] },
+      "transform": { "position": [0.50, -0.55, 0.35] },
+      "material": {
+        "name": "mat_target_box",
+        "base_color": [0.70, 0.56, 0.36],
+        "roughness": 0.55,
+        "metallic": 0.0
+      },
+      "mass": 42.0,
+      "physics": { "restitution": 0.20, "friction": 0.70 }
+    },
+    {
+      "name": "striker",
+      "geometry": { "type": "sphere", "radius": 0.18 },
+      "transform": { "position": [-0.85, -0.55, 0.72] },
+      "material": {
+        "name": "mat_striker",
+        "base_color": [0.88, 0.22, 0.08],
+        "roughness": 0.32,
+        "metallic": 0.0
+      },
+      "mass": 24.0,
+      "physics": {
+        "linear_velocity": [6.0, 0.0, 0.0],
+        "restitution": 0.35,
+        "friction": 0.45
+      }
+    }
+  ],
+  "simulation": {
+    "enabled": true,
+    "physics_dt": 0.004166666666666667,
+    "substeps": 3,
+    "iterations": 8,
+    "baumgarte": 0.25,
+    "slop": 0.002,
+    "restitution_threshold": 0.6,
+    "gravity": [0.0, 0.0, -9.81],
+    "ground_z": 0.0,
+    "ground_friction": 0.75,
+    "ground_restitution": 0.05,
+    "linear_damping": 0.05,
+    "angular_damping": 1.0,
+    "use_toi_splitting": true,
+    "render_fps": 24,
+    "duration": 1.5
+  },
+  "render": {
+    "resolution": [960, 540],
+    "samples": 48,
+    "engine": "CYCLES",
+    "denoise": true,
+    "world_color": [0.055, 0.058, 0.07],
+    "world_strength": 0.3,
+    "exposure": 0.0,
+    "film_transparent": false
+  }
+}

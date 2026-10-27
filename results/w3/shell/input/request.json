@@ -1,0 +1,28 @@
+{
+  "schema": "case_request/1",
+  "name": "shell",
+  "command": [
+    "analyze_object.py",
+    "Code\\assets\\shell.obj",
+    "--mass",
+    "2.4",
+    "--out-dir",
+    "results\\w3"
+  ],
+  "inputs": {
+    "source": "../input/shell.obj",
+    "points": null
+  },
+  "mass_spec": {
+    "mass": 2.4,
+    "density": null,
+    "rule": "mass 直接给定"
+  },
+  "geometry_spec": {
+    "max_faces": 64
+  },
+  "correction_spec": {
+    "requested": "auto",
+    "note": "点云专用。资产里的 correction.mode 是**最终决定**——auto 可能判定为不应修正。"
+  }
+}

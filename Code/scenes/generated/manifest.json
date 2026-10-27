@@ -1,0 +1,36 @@
+{
+  "jobs": [
+    {
+      "scene": "C:\\Users\\81902\\Desktop\\清华课程\\大一上\\高等计算机图形学\\project\\Code\\scenes\\generated\\01_baseline.json",
+      "out": "C:\\Users\\81902\\Desktop\\清华课程\\大一上\\高等计算机图形学\\project\\results\\phase0\\01_baseline.png"
+    },
+    {
+      "scene": "C:\\Users\\81902\\Desktop\\清华课程\\大一上\\高等计算机图形学\\project\\Code\\scenes\\generated\\02_camera_low.json",
+      "out": "C:\\Users\\81902\\Desktop\\清华课程\\大一上\\高等计算机图形学\\project\\results\\phase0\\02_camera_low.png"
+    },
+    {
+      "scene": "C:\\Users\\81902\\Desktop\\清华课程\\大一上\\高等计算机图形学\\project\\Code\\scenes\\generated\\03_camera_closeup.json",
+      "out": "C:\\Users\\81902\\Desktop\\清华课程\\大一上\\高等计算机图形学\\project\\results\\phase0\\03_camera_closeup.png"
+    },
+    {
+      "scene": "C:\\Users\\81902\\Desktop\\清华课程\\大一上\\高等计算机图形学\\project\\Code\\scenes\\generated\\04_light_soft.json",
+      "out": "C:\\Users\\81902\\Desktop\\清华课程\\大一上\\高等计算机图形学\\project\\results\\phase0\\04_light_soft.png"
+    },
+    {
+      "scene": "C:\\Users\\81902\\Desktop\\清华课程\\大一上\\高等计算机图形学\\project\\Code\\scenes\\generated\\05_light_hard.json",
+      "out": "C:\\Users\\81902\\Desktop\\清华课程\\大一上\\高等计算机图形学\\project\\results\\phase0\\05_light_hard.png"
+    },
+    {
+      "scene": "C:\\Users\\81902\\Desktop\\清华课程\\大一上\\高等计算机图形学\\project\\Code\\scenes\\generated\\06_material_roughness.json",
+      "out": "C:\\Users\\81902\\Desktop\\清华课程\\大一上\\高等计算机图形学\\project\\results\\phase0\\06_material_roughness.png"
+    },
+    {
+      "scene": "C:\\Users\\81902\\Desktop\\清华课程\\大一上\\高等计算机图形学\\project\\Code\\scenes\\generated\\07_layout_stack.json",
+      "out": "C:\\Users\\81902\\Desktop\\清华课程\\大一上\\高等计算机图形学\\project\\results\\phase0\\07_layout_stack.png"
+    },
+    {
+      "scene": "C:\\Users\\81902\\Desktop\\清华课程\\大一上\\高等计算机图形学\\project\\Code\\scenes\\generated\\08_hero.json",
+      "out": "C:\\Users\\81902\\Desktop\\清华课程\\大一上\\高等计算机图形学\\project\\results\\phase0\\08_hero.png"
+    }
+  ]
+}

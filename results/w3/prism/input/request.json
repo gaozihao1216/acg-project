@@ -1,0 +1,28 @@
+{
+  "schema": "case_request/1",
+  "name": "prism",
+  "command": [
+    "analyze_object.py",
+    "Code\\assets\\prism.obj",
+    "--mass",
+    "3.0",
+    "--out-dir",
+    "results\\w3"
+  ],
+  "inputs": {
+    "source": "../input/prism.obj",
+    "points": null
+  },
+  "mass_spec": {
+    "mass": 3.0,
+    "density": null,
+    "rule": "mass 直接给定"
+  },
+  "geometry_spec": {
+    "max_faces": 64
+  },
+  "correction_spec": {
+    "requested": "auto",
+    "note": "点云专用。资产里的 correction.mode 是**最终决定**——auto 可能判定为不应修正。"
+  }
+}

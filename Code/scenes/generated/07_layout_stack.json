@@ -1,0 +1,277 @@
+{
+  "name": "07_layout_stack",
+  "camera": {
+    "position": [
+      5.4,
+      -6.2,
+      3.5
+    ],
+    "target": [
+      0.0,
+      0.0,
+      1.25
+    ],
+    "fov": 43.0
+  },
+  "lights": [
+    {
+      "name": "key",
+      "type": "area",
+      "position": [
+        3.4,
+        -2.6,
+        4.6
+      ],
+      "target": [
+        0.0,
+        0.0,
+        0.8
+      ],
+      "energy": 340.0,
+      "size": 2.6,
+      "color": [
+        1.0,
+        0.96,
+        0.92
+      ]
+    },
+    {
+      "name": "fill",
+      "type": "area",
+      "position": [
+        -3.6,
+        -1.8,
+        2.2
+      ],
+      "target": [
+        0.0,
+        0.0,
+        0.6
+      ],
+      "energy": 95.0,
+      "size": 4.0,
+      "color": [
+        0.88,
+        0.93,
+        1.0
+      ]
+    },
+    {
+      "name": "rim",
+      "type": "area",
+      "position": [
+        0.6,
+        4.2,
+        3.2
+      ],
+      "target": [
+        0.0,
+        0.0,
+        0.7
+      ],
+      "energy": 190.0,
+      "size": 3.0,
+      "color": [
+        1.0,
+        1.0,
+        1.0
+      ]
+    }
+  ],
+  "ground": {
+    "enabled": true,
+    "size": 40.0,
+    "color": [
+      0.62,
+      0.62,
+      0.64
+    ],
+    "roughness": 0.55
+  },
+  "objects": [
+    {
+      "name": "stack_1",
+      "geometry": {
+        "type": "box",
+        "size": [
+          1.2,
+          1.2,
+          1.2
+        ]
+      },
+      "transform": {
+        "position": [
+          0.0,
+          0.0,
+          0.6
+        ]
+      },
+      "material": {
+        "name": "mat_stack_1",
+        "base_color": [
+          0.7,
+          0.16,
+          0.05
+        ],
+        "roughness": 0.42,
+        "metallic": 0.0
+      }
+    },
+    {
+      "name": "stack_2",
+      "geometry": {
+        "type": "box",
+        "size": [
+          0.8,
+          0.8,
+          0.8
+        ]
+      },
+      "transform": {
+        "position": [
+          0.0,
+          0.0,
+          1.6
+        ],
+        "orientation_euler_deg": [
+          0.0,
+          0.0,
+          12.0
+        ]
+      },
+      "material": {
+        "name": "mat_stack_2",
+        "base_color": [
+          0.74,
+          0.62,
+          0.42
+        ],
+        "roughness": 0.55,
+        "metallic": 0.0
+      }
+    },
+    {
+      "name": "stack_3",
+      "geometry": {
+        "type": "box",
+        "size": [
+          0.6,
+          0.6,
+          0.6
+        ]
+      },
+      "transform": {
+        "position": [
+          0.02,
+          0.02,
+          2.3
+        ],
+        "orientation_euler_deg": [
+          0.0,
+          0.0,
+          -16.0
+        ]
+      },
+      "material": {
+        "name": "mat_stack_3",
+        "base_color": [
+          0.06,
+          0.2,
+          0.52
+        ],
+        "roughness": 0.35,
+        "metallic": 0.0
+      }
+    },
+    {
+      "name": "stack_ball_1",
+      "geometry": {
+        "type": "sphere",
+        "radius": 0.34
+      },
+      "transform": {
+        "position": [
+          1.45,
+          -0.75,
+          0.34
+        ]
+      },
+      "material": {
+        "name": "mat_stack_ball_1",
+        "base_color": [
+          0.8,
+          0.8,
+          0.83
+        ],
+        "roughness": 0.12,
+        "metallic": 1.0
+      }
+    },
+    {
+      "name": "stack_ball_2",
+      "geometry": {
+        "type": "sphere",
+        "radius": 0.26
+      },
+      "transform": {
+        "position": [
+          -1.6,
+          -1.05,
+          0.26
+        ]
+      },
+      "material": {
+        "name": "mat_stack_ball_2",
+        "base_color": [
+          0.86,
+          0.36,
+          0.06
+        ],
+        "roughness": 0.3,
+        "metallic": 0.0
+      }
+    },
+    {
+      "name": "stack_cyl",
+      "geometry": {
+        "type": "cylinder",
+        "radius": 0.3,
+        "height": 0.8
+      },
+      "transform": {
+        "position": [
+          -2.05,
+          0.35,
+          0.4
+        ]
+      },
+      "material": {
+        "name": "mat_stack_cyl",
+        "base_color": [
+          0.1,
+          0.42,
+          0.3
+        ],
+        "roughness": 0.5,
+        "metallic": 0.0
+      }
+    }
+  ],
+  "render": {
+    "resolution": [
+      960,
+      540
+    ],
+    "samples": 64,
+    "engine": "CYCLES",
+    "denoise": true,
+    "world_color": [
+      0.055,
+      0.058,
+      0.07
+    ],
+    "world_strength": 0.3,
+    "exposure": 0.0,
+    "film_transparent": false
+  }
+}

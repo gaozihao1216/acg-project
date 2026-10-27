@@ -1,0 +1,359 @@
+{
+  "schema": "object_asset/1",
+  "name": "shell",
+  "units": {
+    "length": "m",
+    "mass": "kg",
+    "angle": "rad"
+  },
+  "paths_relative_to": ".",
+  "source": {
+    "origin": "mesh",
+    "path": "../input/shell.obj",
+    "sha256": "e0a55e33aaf7d5e49d9a77786b08a4408724191e51c43065cee3139db196b0e5",
+    "vertices": 16,
+    "faces": 24,
+    "is_closed": true,
+    "is_consistently_oriented": true,
+    "euler_characteristic": 4,
+    "signed_volume": 0.5610239999999997
+  },
+  "frames": {
+    "source": {
+      "origin": "输入文件的坐标原点",
+      "axes": "输入文件自己的坐标轴"
+    },
+    "body": {
+      "origin": "质心",
+      "axes": "惯量主轴（按主惯量升序 λ1 ≤ λ2 ≤ λ3）"
+    },
+    "source_to_body": {
+      "formula": "p_body = R(rotation) @ (p_source + translation)",
+      "translation": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rotation_wxyz": [
+        1.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    "body_to_source": {
+      "formula": "p_source = R(rotation) @ p_body + translation",
+      "translation": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rotation_wxyz": [
+        1.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    }
+  },
+  "mass_properties": {
+    "frame": "source",
+    "mass": 2.4,
+    "volume": 0.5610239999999997,
+    "density": 4.27789185489391,
+    "surface_area": 9.465600000000002,
+    "center_of_mass": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "inertia_com": [
+      [
+        0.5322035865845315,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.5322035865845315,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        0.5322035865845315
+      ]
+    ],
+    "inertia_products": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "non_diagonal_ratio": 0.0,
+    "correction": {
+      "mode": "none",
+      "weighted": false
+    }
+  },
+  "principal": {
+    "moments": [
+      0.5322035865845315,
+      0.5322035865845315,
+      0.5322035865845315
+    ],
+    "axes_columns": [
+      [
+        1.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        1.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        1.0
+      ]
+    ],
+    "quaternion_wxyz": [
+      1.0,
+      0.0,
+      0.0,
+      0.0
+    ]
+  },
+  "collision": {
+    "representation": "convex_hull",
+    "frame": "body",
+    "points": [
+      [
+        -0.5,
+        -0.5,
+        -0.5
+      ],
+      [
+        0.5,
+        -0.5,
+        -0.5
+      ],
+      [
+        0.5,
+        0.5,
+        -0.5
+      ],
+      [
+        -0.5,
+        0.5,
+        -0.5
+      ],
+      [
+        -0.5,
+        -0.5,
+        0.5
+      ],
+      [
+        0.5,
+        -0.5,
+        0.5
+      ],
+      [
+        0.5,
+        0.5,
+        0.5
+      ],
+      [
+        -0.5,
+        0.5,
+        0.5
+      ]
+    ],
+    "faces": [
+      [
+        2,
+        1,
+        0,
+        3
+      ],
+      [
+        1,
+        2,
+        6,
+        5
+      ],
+      [
+        6,
+        2,
+        3,
+        7
+      ],
+      [
+        0,
+        1,
+        5,
+        4
+      ],
+      [
+        3,
+        0,
+        4,
+        7
+      ],
+      [
+        4,
+        5,
+        6,
+        7
+      ]
+    ],
+    "edges": [
+      [
+        1,
+        2
+      ],
+      [
+        0,
+        1
+      ],
+      [
+        0,
+        3
+      ],
+      [
+        2,
+        3
+      ],
+      [
+        2,
+        6
+      ],
+      [
+        5,
+        6
+      ],
+      [
+        1,
+        5
+      ],
+      [
+        3,
+        7
+      ],
+      [
+        6,
+        7
+      ],
+      [
+        4,
+        5
+      ],
+      [
+        0,
+        4
+      ],
+      [
+        4,
+        7
+      ]
+    ],
+    "face_count": 6,
+    "edge_count": 12,
+    "volume": 1.0,
+    "hull_fill_ratio": 1.7824549395391294,
+    "sat_candidate_axes": 156
+  },
+  "render": {
+    "object_name": "shell",
+    "mesh": {
+      "path": "../input/shell.obj",
+      "frame": "source",
+      "vertices": 16,
+      "faces": 24
+    },
+    "materials": [
+      {
+        "slot": "body",
+        "base_color": [
+          0.62,
+          0.68,
+          0.78,
+          1.0
+        ],
+        "roughness": 0.45,
+        "metallic": 0.0
+      }
+    ],
+    "ground": {
+      "enabled": true,
+      "size": 8.0
+    }
+  },
+  "engine": {
+    "inertia_local": [
+      0.5322035865845315,
+      0.5322035865845315,
+      0.5322035865845315
+    ],
+    "orientation_offset_wxyz": [
+      1.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "orientation_formula": "orientation = quat_multiply(spec_orientation, offset)",
+    "ground_z_offset": 0.5,
+    "notes": "引擎内部只存对角惯量；把主轴旋转并进姿态后 I_world = (R·Q)·diag(inertia_local)·(R·Q)ᵀ 依然成立。"
+  },
+  "checks": [
+    {
+      "name": "principal_axes_orthonormal",
+      "ok": true,
+      "detail": "正交误差=0.00e+00，det=+1.000000000000（须为 +1）",
+      "severity": "error"
+    },
+    {
+      "name": "tensor_reconstruction",
+      "ok": true,
+      "detail": "max|QΛQᵀ − I| / 最大对角元 = 0.00e+00",
+      "severity": "error"
+    },
+    {
+      "name": "frame_quaternions_conjugate",
+      "ok": true,
+      "detail": "source_to_body 与 orientation_offset 应互为共轭，差异=0.00e+00",
+      "severity": "error"
+    },
+    {
+      "name": "volume_positive",
+      "ok": true,
+      "detail": "体积=0.561024000 m³",
+      "severity": "error"
+    },
+    {
+      "name": "mesh_closed",
+      "ok": true,
+      "detail": "闭合=True，缠绕一致=True，χ=4",
+      "severity": "error"
+    },
+    {
+      "name": "collision_is_exact",
+      "ok": false,
+      "detail": "凸包/本体 = 1.782455  ← 有凹陷，碰撞代理偏大",
+      "severity": "info"
+    },
+    {
+      "name": "diagonal_approximation_safe",
+      "ok": true,
+      "detail": "非对角占比=0.000%（可用对角近似）",
+      "severity": "info"
+    },
+    {
+      "name": "ground_offset_nonnegative",
+      "ok": true,
+      "detail": "ground_z_offset=+0.500000 m（把物体放到地面上所需的抬升）",
+      "severity": "error"
+    }
+  ]
+}

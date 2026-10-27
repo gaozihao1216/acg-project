@@ -1,0 +1,206 @@
+{
+  "name": "06_material_roughness",
+  "camera": {
+    "position": [
+      0.0,
+      -7.4,
+      2.4
+    ],
+    "target": [
+      0.0,
+      0.0,
+      0.55
+    ],
+    "fov": 40.0
+  },
+  "lights": [
+    {
+      "name": "key",
+      "type": "area",
+      "position": [
+        3.4,
+        -2.6,
+        4.6
+      ],
+      "target": [
+        0.0,
+        0.0,
+        0.8
+      ],
+      "energy": 340.0,
+      "size": 2.6,
+      "color": [
+        1.0,
+        0.96,
+        0.92
+      ]
+    },
+    {
+      "name": "fill",
+      "type": "area",
+      "position": [
+        -3.6,
+        -1.8,
+        2.2
+      ],
+      "target": [
+        0.0,
+        0.0,
+        0.6
+      ],
+      "energy": 95.0,
+      "size": 4.0,
+      "color": [
+        0.88,
+        0.93,
+        1.0
+      ]
+    },
+    {
+      "name": "rim",
+      "type": "area",
+      "position": [
+        0.6,
+        4.2,
+        3.2
+      ],
+      "target": [
+        0.0,
+        0.0,
+        0.7
+      ],
+      "energy": 190.0,
+      "size": 3.0,
+      "color": [
+        1.0,
+        1.0,
+        1.0
+      ]
+    }
+  ],
+  "ground": {
+    "enabled": true,
+    "size": 40.0,
+    "color": [
+      0.62,
+      0.62,
+      0.64
+    ],
+    "roughness": 0.55
+  },
+  "objects": [
+    {
+      "name": "roughness_0_03",
+      "geometry": {
+        "type": "sphere",
+        "radius": 0.45
+      },
+      "transform": {
+        "position": [
+          -1.95,
+          0.0,
+          0.45
+        ]
+      },
+      "material": {
+        "name": "metal_rough_0",
+        "base_color": [
+          0.85,
+          0.73,
+          0.45
+        ],
+        "roughness": 0.03,
+        "metallic": 1.0
+      }
+    },
+    {
+      "name": "roughness_0_22",
+      "geometry": {
+        "type": "sphere",
+        "radius": 0.45
+      },
+      "transform": {
+        "position": [
+          -0.65,
+          0.0,
+          0.45
+        ]
+      },
+      "material": {
+        "name": "metal_rough_1",
+        "base_color": [
+          0.72,
+          0.75,
+          0.8
+        ],
+        "roughness": 0.22,
+        "metallic": 1.0
+      }
+    },
+    {
+      "name": "roughness_0_52",
+      "geometry": {
+        "type": "sphere",
+        "radius": 0.45
+      },
+      "transform": {
+        "position": [
+          0.65,
+          0.0,
+          0.45
+        ]
+      },
+      "material": {
+        "name": "metal_rough_2",
+        "base_color": [
+          0.8,
+          0.55,
+          0.42
+        ],
+        "roughness": 0.52,
+        "metallic": 1.0
+      }
+    },
+    {
+      "name": "roughness_0_88",
+      "geometry": {
+        "type": "sphere",
+        "radius": 0.45
+      },
+      "transform": {
+        "position": [
+          1.95,
+          0.0,
+          0.45
+        ]
+      },
+      "material": {
+        "name": "metal_rough_3",
+        "base_color": [
+          0.45,
+          0.6,
+          0.72
+        ],
+        "roughness": 0.88,
+        "metallic": 1.0
+      }
+    }
+  ],
+  "render": {
+    "resolution": [
+      960,
+      540
+    ],
+    "samples": 64,
+    "engine": "CYCLES",
+    "denoise": true,
+    "world_color": [
+      0.055,
+      0.058,
+      0.07
+    ],
+    "world_strength": 0.3,
+    "exposure": 0.0,
+    "film_transparent": false
+  }
+}

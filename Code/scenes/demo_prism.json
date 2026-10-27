@@ -1,0 +1,113 @@
+{
+  "name": "prism",
+  "camera": {
+    "position": [
+      2.6,
+      -3.6,
+      2.2
+    ],
+    "target": [
+      0.0,
+      0.0,
+      0.5
+    ],
+    "fov": 45.0
+  },
+  "ground": {
+    "enabled": true,
+    "z": 0.0,
+    "friction": 0.8,
+    "restitution": 0.05,
+    "color": [
+      0.22,
+      0.23,
+      0.25
+    ]
+  },
+  "objects": [
+    {
+      "name": "prism",
+      "geometry": {
+        "type": "hull",
+        "points": [
+          [
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            1.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.4,
+            1.1,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.6
+          ],
+          [
+            1.0,
+            0.0,
+            0.6
+          ],
+          [
+            0.4,
+            1.1,
+            0.6
+          ]
+        ]
+      },
+      "transform": {
+        "position": [
+          0.0,
+          0.0,
+          0.3200000000000001
+        ]
+      },
+      "mass": 3.0,
+      "material": {
+        "base_color": [
+          0.28,
+          0.55,
+          0.85
+        ],
+        "roughness": 0.45,
+        "metallic": 0.05
+      },
+      "physics": {
+        "restitution": 0.15,
+        "friction": 0.75
+      }
+    }
+  ],
+  "simulation": {
+    "enabled": true,
+    "physics_dt": 0.004166666666666667,
+    "substeps": 3,
+    "iterations": 8,
+    "baumgarte": 0.25,
+    "slop": 0.002,
+    "restitution_threshold": 0.6,
+    "gravity": [
+      0.0,
+      0.0,
+      -9.81
+    ],
+    "ground_z": 0.0,
+    "ground_friction": 0.8,
+    "ground_restitution": 0.05,
+    "linear_damping": 0.05,
+    "angular_damping": 1.0,
+    "use_toi_splitting": true,
+    "max_events_per_substep": 8,
+    "broadphase": "spatial_hash",
+    "broadphase_cell_size": 0.0,
+    "render_fps": 24,
+    "duration": 1.5
+  }
+}

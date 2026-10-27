@@ -1,0 +1,144 @@
+{
+  "name": "sim_spheres",
+  "camera": {
+    "position": [3.5, -4.2, 1.85],
+    "target": [0.0, 0.0, 0.85],
+    "fov": 44.0
+  },
+  "lights": [
+    {
+      "name": "key",
+      "type": "area",
+      "position": [3.4, -2.6, 4.6],
+      "target": [0.0, 0.0, 0.8],
+      "energy": 340.0,
+      "size": 2.6,
+      "color": [1.0, 0.96, 0.92]
+    },
+    {
+      "name": "fill",
+      "type": "area",
+      "position": [-3.6, -1.8, 2.2],
+      "target": [0.0, 0.0, 0.6],
+      "energy": 95.0,
+      "size": 4.0,
+      "color": [0.88, 0.93, 1.0]
+    },
+    {
+      "name": "rim",
+      "type": "area",
+      "position": [0.6, 4.2, 3.2],
+      "target": [0.0, 0.0, 0.7],
+      "energy": 190.0,
+      "size": 3.0,
+      "color": [1.0, 1.0, 1.0]
+    }
+  ],
+  "ground": {
+    "enabled": true,
+    "size": 40.0,
+    "color": [0.62, 0.62, 0.64],
+    "roughness": 0.55
+  },
+  "objects": [
+    {
+      "name": "ball_base",
+      "geometry": { "type": "sphere", "radius": 0.42 },
+      "transform": { "position": [0.0, 0.0, 0.42] },
+      "material": {
+        "name": "mat_sand",
+        "base_color": [0.70, 0.58, 0.40],
+        "roughness": 0.60,
+        "metallic": 0.0
+      },
+      "physics": { "static": true, "restitution": 0.20, "friction": 0.70 }
+    },
+    {
+      "name": "ball_bouncy",
+      "geometry": { "type": "sphere", "radius": 0.30 },
+      "transform": { "position": [0.0, 0.0, 1.75] },
+      "material": {
+        "name": "mat_orange",
+        "base_color": [0.86, 0.32, 0.03],
+        "roughness": 0.42,
+        "metallic": 0.0
+      },
+      "physics": { "restitution": 0.55, "friction": 0.30 }
+    },
+    {
+      "name": "ball_metal",
+      "geometry": { "type": "sphere", "radius": 0.24 },
+      "transform": { "position": [-0.85, 0.25, 1.45] },
+      "material": {
+        "name": "mat_metal",
+        "base_color": [0.80, 0.82, 0.85],
+        "roughness": 0.16,
+        "metallic": 1.0
+      },
+      "physics": { "restitution": 0.45, "friction": 0.22 }
+    },
+    {
+      "name": "ball_red",
+      "geometry": { "type": "sphere", "radius": 0.20 },
+      "transform": { "position": [0.85, 0.15, 1.50] },
+      "material": {
+        "name": "mat_red",
+        "base_color": [0.72, 0.055, 0.03],
+        "roughness": 0.40,
+        "metallic": 0.0
+      },
+      "physics": { "restitution": 0.35, "friction": 0.55 }
+    },
+    {
+      "name": "ball_green",
+      "geometry": { "type": "sphere", "radius": 0.20 },
+      "transform": { "position": [-0.50, -0.80, 1.40] },
+      "material": {
+        "name": "mat_green",
+        "base_color": [0.06, 0.42, 0.22],
+        "roughness": 0.50,
+        "metallic": 0.0
+      },
+      "physics": { "restitution": 0.55, "friction": 0.40 }
+    },
+    {
+      "name": "ball_white",
+      "geometry": { "type": "sphere", "radius": 0.16 },
+      "transform": { "position": [0.62, -0.72, 1.55] },
+      "material": {
+        "name": "mat_white",
+        "base_color": [0.86, 0.86, 0.88],
+        "roughness": 0.30,
+        "metallic": 0.0
+      },
+      "physics": { "restitution": 0.50, "friction": 0.45 }
+    }
+  ],
+  "simulation": {
+    "enabled": true,
+    "physics_dt": 0.004166666666666667,
+    "substeps": 2,
+    "iterations": 12,
+    "baumgarte": 0.25,
+    "slop": 0.002,
+    "restitution_threshold": 1.0,
+    "gravity": [0.0, 0.0, -9.81],
+    "ground_z": 0.0,
+    "ground_friction": 0.55,
+    "ground_restitution": 0.15,
+    "linear_damping": 0.05,
+    "angular_damping": 1.0,
+    "render_fps": 24,
+    "duration": 2.0
+  },
+  "render": {
+    "resolution": [960, 540],
+    "samples": 48,
+    "engine": "CYCLES",
+    "denoise": true,
+    "world_color": [0.055, 0.058, 0.07],
+    "world_strength": 0.3,
+    "exposure": 0.0,
+    "film_transparent": false
+  }
+}
