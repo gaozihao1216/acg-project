@@ -53,12 +53,9 @@ from .body import RigidBody
 from .contact import GROUND_BODY, ContactManifold, ContactPoint, merge_pair_materials
 from ..geom.geometry import (
     BoxGeometry,
-    CapsuleGeometry,
     CompoundGeometry,
     ConvexHullGeometry,
-    CylinderGeometry,
     GeometrySpec,
-    SphereGeometry,
 )
 from .body import iter_parts
 from .convex_sat import (
@@ -459,19 +456,61 @@ def collide_capsule_ground(
     return points
 
 
-def _part_ground_points(view, ground: GroundPlane) -> list[ContactPoint]:
-    """单个部件与地面的接触点。``view`` 可以是刚体，也可以是复合体的部件视图。"""
-    geometry = view.geometry
-    if isinstance(geometry, BoxGeometry):
-        return collide_box_ground(view, ground)
-    if isinstance(geometry, ConvexHullGeometry):
-        return collide_hull_ground(view, ground)
-    if isinstance(geometry, CylinderGeometry):
-        return collide_cylinder_ground(view, ground)
-    if isinstance(geometry, CapsuleGeometry):
-        return collide_capsule_ground(view, ground)
-    single = collide_sphere_ground(view, ground)
+def collide_convex_ground(body, ground: GroundPlane) -> list[ContactPoint]:
+    """通用凸体-地面：取沿 ``-Z`` 的**支撑特征**，裁掉没入地面的点。
+
+    这一条公式覆盖了"没有专属实现"的所有凸体——球、圆锥、圆台、椭球、球冠，
+    以及将来任何实现了 ``support()`` 的几何。
+
+    为什么是"支撑特征"而不是"支撑点"
+    --------------------------------
+    只取 ``support(-Z)`` 会得到**一个**点。球可以用（严格凸，本来就只碰一点），
+    但底面是平圆盘的东西不行：立着的圆锥若只在地面圆盘上取一个点，法向约束只
+    挡住一个方向，物体会绕该点翻转——正是盒-地面当初必须给 4 个点的原因。
+    ``feature_world`` 因此返回"沿该方向同样远的一整片"：圆盘给 4 个圆周点，
+    严格凸体给 1 个点。
+
+    深度逐点按投影算，不做"统一深度"：倾斜时其余点更浅甚至为负，会被裁掉，
+    流形自然退化，不需要额外写退化逻辑。
+
+    球走这条路与解析式 ``collide_sphere_ground`` **逐位相同**：接触点取
+    "表面点与地面投影的中点"，与解析式的 ``ground.z + 0.5(h - r)`` 是同一个式子。
+    """
+    points: list[ContactPoint] = []
+    for world in support_module.feature_world(body, (0.0, 0.0, -1.0)):
+        if world[2] >= ground.z:
+            continue
+        points.append(
+            ContactPoint(
+                position=(world[0], world[1], 0.5 * (world[2] + ground.z)),
+                normal=(0.0, 0.0, 1.0),
+                penetration=ground.z - world[2],
+            )
+        )
+
+    if len(points) > MAX_BOX_GROUND_POINTS:
+        points.sort(key=lambda item: item.penetration, reverse=True)
+        del points[MAX_BOX_GROUND_POINTS:]
+    return points
+
+
+def _sphere_ground_points(body, ground: GroundPlane) -> list[ContactPoint]:
+    """``collide_sphere_ground`` 的列表化包装，便于和分派表统一返回类型。"""
+    single = collide_sphere_ground(body, ground)
     return [single] if single is not None else []
+
+
+def _part_ground_points(view, ground: GroundPlane) -> list[ContactPoint]:
+    """单个部件与地面的接触点。``view`` 可以是刚体，也可以是复合体的部件视图。
+
+    未登记的几何（例如还没接入能力矩阵的新图元）直接走通用解；若它连支撑映射
+    都没有，``feature_world`` 会带着类型名抛 ``TypeError``，而不是静默返回空。
+    """
+    kind = capabilities.kind_of(view.geometry)
+    handler = _GROUND_DISPATCH.get(kind)
+    if handler is not None:
+        return handler(view, ground)
+    return collide_convex_ground(view, ground)
 
 
 def collide_compound_ground(
@@ -610,6 +649,23 @@ def collide_hull_ground(
         del points[MAX_BOX_GROUND_POINTS:]
 
     return points
+
+
+#: 地面接触分派表：几何种类 -> 处理函数（统一返回 ``list[ContactPoint]``）。
+#:
+#: 表里只放**有专属精确解**的几何：多面体族用顶点解、柱与胶囊用解析的圆周/端球
+#: 最低点解，它们的 TOI 也都是精确或单调可证的。其余一律走
+#: :func:`collide_convex_ground` 的支撑特征解——于是"加一种凸体"依然不需要写
+#: 任何地面代码，这与物体对分派表的策略一致。
+#:
+#: 放在所有地面函数**之后**：本表在导入时求值，函数对象必须已经存在。
+_GROUND_DISPATCH = {
+    "sphere": _sphere_ground_points,
+    "box": collide_box_ground,
+    "hull": collide_hull_ground,
+    "cylinder": collide_cylinder_ground,
+    "capsule": collide_capsule_ground,
+}
 
 
 # ---------------------------------------------------------------------------

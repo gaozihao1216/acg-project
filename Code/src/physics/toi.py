@@ -42,6 +42,7 @@ from ..geom.geometry import (
     SphereGeometry,
 )
 from . import gjk as _gjk
+from . import capabilities
 from .body import RigidBody, iter_parts
 from .convex_sat import (
     Polytope,
@@ -531,11 +532,14 @@ def curved_ground_toi(
     max_time: float,
     cache: dict | None = None,
 ) -> float | None:
-    """柱/胶囊与水平地面：支撑点最低高度 + 保守推进。
+    """支撑点最低高度 + 保守推进：柱/胶囊的专属解，也是所有未登记几何的兜底。
 
     最低点用 ``support(-Z)`` 直接取到（对柱是端面圆周上的精确最低点，对胶囊
-    是端球底部），所以间隙是精确的；不确定的只有"它下降得多快"，用
-    ``max(0, -v_z) + |ω|R`` 作为上界，因此整体是保守估计。
+    是端球底部，对圆锥/圆台/椭球/球冠同理），所以**间隙是精确的**；不确定的
+    只有"它下降得多快"，用 ``max(0, -v_z) + |ω|R`` 作为上界，因此整体是保守估计。
+
+    这个函数不假设任何具体形状，只依赖 ``support()``，所以圆锥、圆台、椭球、
+    球冠不用再各写一个 TOI。保守只意味着"可能提前一点点切分"，不会漏碰撞。
     """
     lowest = support_world(body, (0.0, 0.0, -1.0))
     gap = lowest[2] - ground.z
@@ -686,20 +690,50 @@ def _dispatch_toi(
     return hull_hull_toi(body_a, body_b, max_time, cache)
 
 
+def _sphere_ground_toi(
+    body: RigidBody,
+    ground: GroundPlane,
+    max_time: float,
+    cache: dict | None = None,
+) -> float | None:
+    """``sphere_ground_toi`` 的表格化包装（它不需要 cache，签名对齐而已）。"""
+    return sphere_ground_toi(body, ground, max_time)
+
+
+#: 地面 TOI 分派表：几何种类 -> 处理函数。
+#:
+#: 与窄相的地面分派表同一套思路，表里只放**有精确解**的几何：
+#:
+#: - 球：一元一次（``z_center - r`` 线性下降），精确
+#: - 盒 / 凸包：顶点做直线运动，取各顶点到达地面的最早时刻，精确
+#: - 柱 / 胶囊：最低点解析、下降速度取上界，保守
+#:
+#: 表里没有的种类走 ``curved_ground_toi``：它只依赖 ``support(-Z)`` 与
+#: ``|ω|R``，不假设任何具体形状，所以圆锥、圆台、椭球、球冠天然可用。
+#: 保守只意味着"可能提前切分"，不会漏碰撞。
+_GROUND_TOI_DISPATCH = {
+    "sphere": _sphere_ground_toi,
+    "box": hull_ground_toi,
+    "hull": hull_ground_toi,
+    "cylinder": curved_ground_toi,
+    "capsule": curved_ground_toi,
+}
+
+
 def ground_toi(
     body: RigidBody,
     ground: GroundPlane,
     max_time: float,
     cache: dict | None = None,
 ) -> float | None:
-    """刚体与地面的接触时刻（球走一元一次，柱/胶囊走支撑点，其余走顶点解）。"""
+    """刚体与地面的接触时刻（查表；未登记的几何走保守支撑点解）。"""
     if isinstance(body.geometry, CompoundGeometry):
         return compound_ground_toi(body, ground, max_time, cache)
-    if isinstance(body.geometry, _CURVED):
+
+    handler = _GROUND_TOI_DISPATCH.get(capabilities.kind_of(body.geometry))
+    if handler is None:
         return curved_ground_toi(body, ground, max_time, cache)
-    if isinstance(body.geometry, SphereGeometry):
-        return sphere_ground_toi(body, ground, max_time)
-    return hull_ground_toi(body, ground, max_time, cache)
+    return handler(body, ground, max_time, cache)
 
 
 def earliest_toi(

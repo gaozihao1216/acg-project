@@ -169,7 +169,9 @@ def world_aabb(body: RigidBody) -> AABB:
         ]
         return AABB(tuple(low), tuple(high))
 
-    # 其余几何（柱、胶囊）暂未接入窄相；用包围球兜底，保证保守不漏
+    # 其余几何（柱、胶囊、圆锥、圆台、椭球、球冠）用包围球兜底：曲面体算精确
+    # AABB 要旋转椭球/端面圆，收益不大，而兜底保证**保守不漏**——宽阶段多放几个
+    # 候选对只是多跑几次窄相，漏掉才是错。
     radius = body.bounding_radius
     return AABB(
         (center[0] - radius, center[1] - radius, center[2] - radius),

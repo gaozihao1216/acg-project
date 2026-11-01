@@ -33,6 +33,7 @@ TEST_MODULES = [
     "test_curved",
     "test_compound",
     "test_inertia_modes",
+    "test_ground_generic",
     "test_object_input",
     "test_asset",
     "test_capabilities",

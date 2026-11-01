@@ -307,6 +307,16 @@ class PartView:
         self.restitution = body.restitution
         self.is_static = body.is_static
 
+    @property
+    def bounding_radius(self) -> float:
+        """包围球半径。
+
+        必须与 ``RigidBody.bounding_radius`` 同名同义：宽阶段对复合体是**逐部件**
+        算 AABB 的（``world_aabb`` 会拿 ``PartView`` 再递归一次），少了这个属性，
+        "复合体 + TOI 切分"这条路径会在运行期抛 ``AttributeError``。
+        """
+        return self.geometry.bounding_radius()
+
 
 def iter_parts(body) -> list:
     """列出参与碰撞的部件：``[(部件编号, 部件视图), ...]``。

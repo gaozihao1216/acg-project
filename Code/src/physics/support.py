@@ -30,9 +30,13 @@ import math
 from ..geom.geometry import (
     BoxGeometry,
     CapsuleGeometry,
+    ConeGeometry,
     ConvexHullGeometry,
     CylinderGeometry,
+    EllipsoidGeometry,
+    FrustumGeometry,
     SphereGeometry,
+    SphericalCapGeometry,
 )
 from ..mathutils import quaternion as quat
 from ..mathutils import vec3
@@ -102,10 +106,15 @@ def feature_world(
 
     所以这里按几何形状解析地枚举"朝 ``direction`` 看过去最凸的那一片"：
 
-    - 球：恒定 1 个点
+    - 球 / 椭球：恒定 1 个点（严格凸）
     - 盒 / 凸包：支撑值落在最大值 ``tol`` 内的顶点（面贴面时最多 4 个）
     - 圆柱：正对端面 → 该端面圆周上 4 个点；正对侧面 → 两条母线的端点（2 个）
     - 胶囊：正对侧面 → 两端球心各一点（2 个）
+    - 圆锥 / 圆台 / 球冠：端面圆盘正对方向 → 该圆周上 4 个点；否则 1 个点
+
+    圆盘类几何"正对"的判据是方向与轴线的夹角余弦，用约 3° 的容差而不是严格相等：
+    立着的柱被求解器微调几毫弧度后，严格判据会让流形从 4 点塌成 1 点，物体随即
+    开始摇摆。
 
     返回的点都**在表面上**（不是中点），接触点由调用方在两侧之间取中点。
     """
@@ -212,7 +221,62 @@ def feature_world(
             ]
         return [support_world(body, direction)]
 
+    if isinstance(geometry, EllipsoidGeometry):
+        # 椭球是严格凸的：任意方向只有一个支撑点
+        return [support_world(body, direction)]
+
+    if isinstance(geometry, ConeGeometry):
+        if cos_axis <= -_FACE_COS_TOL:
+            # 底面正对方向：整个底面圆盘等深，圆周取 4 点才撑得住"平放不翻"
+            return _face_ring(body, axis, geometry._base_z, geometry.radius)
+        # 其余方向（含顶点朝下）只有一个支撑点：圆锥是"圆盘 + 顶点"的凸包，
+        # 支撑集要么是整块底面，要么是单点，不会出现线段
+        return [support_world(body, direction)]
+
+    if isinstance(geometry, FrustumGeometry):
+        if cos_axis <= -_FACE_COS_TOL:
+            return _face_ring(body, axis, geometry._bottom_z, geometry.bottom_radius)
+        if cos_axis >= _FACE_COS_TOL:
+            return _face_ring(body, axis, geometry._top_z, geometry.top_radius)
+        # 斜着支撑时最大值落在某条端面圆周上，是**一个**点（圆台侧面是直纹面，
+        # 但只有沿母线方向才会退化成线段，而那条线段的深度并不相同）
+        return [support_world(body, direction)]
+
+    if isinstance(geometry, SphericalCapGeometry):
+        if cos_axis <= -_FACE_COS_TOL:
+            # 平底正对方向：底面圆盘就是接触面
+            return _face_ring(body, axis, geometry._base_z, geometry._rim_radius)
+        return [support_world(body, direction)]
+
     raise TypeError(f"不支持支撑特征采样的几何类型：{type(geometry).__name__}")
+
+
+def _face_ring(body, axis, center_local_z: float, radius: float):
+    """端面接触：把该端面的圆周等角取 4 点（世界坐标）。
+
+    取 4 点是"够用"而不是"精确"：端面是个圆盘，理论上无穷多点等深。4 个等分点
+    足以让法向约束张成整个平面，物体不会绕单点翻转；倾斜时其余点深度更浅，
+    会被逐点裁剪掉，自然退化成 1–2 点接触。
+
+    角度取 45°、135°、225°、315°：避开 0°，免得"立得笔直的柱"在 x/y 轴上留下
+    与坐标轴方向重合的接触点——那种对齐会让求解器的摩擦约束出现方向退化。
+    """
+    if radius <= _EPS:
+        # 退化端面（圆锥的顶点、圆台的 0 半径端）：没有圆周可取
+        center = _local_to_world(body, (0.0, 0.0, center_local_z))
+        return [center]
+
+    center = _local_to_world(body, (0.0, 0.0, center_local_z))
+    e1, e2 = vec3.orthogonal_basis(axis)
+    return [
+        vec3.add(center, _ring_offset(e1, e2, angle, radius))
+        for angle in (
+            math.pi * 0.25,
+            math.pi * 0.75,
+            math.pi * 1.25,
+            math.pi * 1.75,
+        )
+    ]
 
 
 def _local_to_world(body, point) -> tuple[float, float, float]:
