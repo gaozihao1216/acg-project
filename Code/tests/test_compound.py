@@ -179,6 +179,8 @@ def test_scene_json_roundtrip() -> tuple[bool, str]:
                 "name": "dumbbell",
                 "geometry": {
                     "type": "compound",
+                    # 盒与球明显分开摆放，属于"互不重叠"，走解析求和
+                    "overlap": "disjoint",
                     "parts": [
                         {
                             "geometry": {"type": "box", "size": [0.3, 0.3, 0.3]},

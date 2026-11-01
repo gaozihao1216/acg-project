@@ -21,10 +21,14 @@ from .geometry import (
     BoxGeometry,
     CapsuleGeometry,
     CompoundGeometry,
+    ConeGeometry,
     ConvexHullGeometry,
     CylinderGeometry,
+    EllipsoidGeometry,
+    FrustumGeometry,
     GeometrySpec,
     SphereGeometry,
+    SphericalCapGeometry,
 )
 
 
@@ -144,6 +148,15 @@ def compute_inertia(geometry: GeometrySpec, mass: float) -> tuple[float, float, 
         return cylinder_inertia(mass, geometry.radius, geometry.height)
     if isinstance(geometry, CapsuleGeometry):
         return capsule_inertia(mass, geometry.radius, geometry.height)
+    if isinstance(geometry, EllipsoidGeometry):
+        return geometry.principal_moments(mass)
+    if isinstance(
+        geometry, (ConeGeometry, FrustumGeometry, SphericalCapGeometry)
+    ):
+        # 旋转体的质量属性由 ``revolution.solid_of_revolution`` 闭式积分给出
+        # （被积函数是半径平方的多项式，积分是精确的，不是采样近似）。
+        # 张量在自身坐标下已对角、质心已在原点，所以不需要 inertia_frame 参与。
+        return geometry.principal_moments(mass)
     if isinstance(geometry, CompoundGeometry):
         # 复合体的张量由部件合成（含平行轴定理），一般含惯量积；
         # 这里返回的同样是**主惯量**，必须与 ``inertia_frame()`` 成对使用。

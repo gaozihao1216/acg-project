@@ -54,6 +54,10 @@ _SIDE_COS_TOL = 0.05
 def support_local(geometry, direction) -> tuple[float, float, float]:
     """几何体在**局部坐标**下沿 ``direction`` 的最远点。
 
+    实现已经下沉到 ``GeometrySpec.support``：每种几何最清楚自己的支撑点怎么算，
+    这里只做一次委托。这样新增一种几何**不需要碰本模块**——"加几何就要改碰撞
+    代码"正是支撑映射要消灭的成本。
+
     参数
     ----
     geometry  : 任一种几何对象
@@ -63,73 +67,11 @@ def support_local(geometry, direction) -> tuple[float, float, float]:
     ----
     tuple[float, float, float] : 局部坐标下的支撑点
 
-    说明
+    异常
     ----
-    圆柱/胶囊的轴向约定与 ``geom.geometry`` 一致：轴为 **局部 +Z**。
-    分量恰为 0 的方向按"取正侧"处理，保证结果确定（不随浮点抖动翻转）。
+    TypeError : 该几何没有支撑映射（例如组合体，它靠逐部件展开参与碰撞）
     """
-    length = math.sqrt(
-        direction[0] * direction[0]
-        + direction[1] * direction[1]
-        + direction[2] * direction[2]
-    )
-
-    if isinstance(geometry, SphereGeometry):
-        if length <= _EPS:
-            return (0.0, 0.0, 0.0)
-        scale = geometry.radius / length
-        return (direction[0] * scale, direction[1] * scale, direction[2] * scale)
-
-    if isinstance(geometry, BoxGeometry):
-        size = geometry.size
-        half = (0.5 * size[0], 0.5 * size[1], 0.5 * size[2])
-        return (
-            half[0] if direction[0] >= 0.0 else -half[0],
-            half[1] if direction[1] >= 0.0 else -half[1],
-            half[2] if direction[2] >= 0.0 else -half[2],
-        )
-
-    if isinstance(geometry, ConvexHullGeometry):
-        vertices = geometry.vertices
-        best = vertices[0]
-        best_score = (
-            best[0] * direction[0] + best[1] * direction[1] + best[2] * direction[2]
-        )
-        for vertex in vertices:
-            score = (
-                vertex[0] * direction[0]
-                + vertex[1] * direction[1]
-                + vertex[2] * direction[2]
-            )
-            if score > best_score:
-                best_score = score
-                best = vertex
-        return best
-
-    if isinstance(geometry, CylinderGeometry):
-        radius = geometry.radius
-        half_height = 0.5 * geometry.height
-        z = half_height if direction[2] >= 0.0 else -half_height
-        radial = math.hypot(direction[0], direction[1])
-        if radial <= _EPS:
-            return (0.0, 0.0, z)
-        scale = radius / radial
-        return (direction[0] * scale, direction[1] * scale, z)
-
-    if isinstance(geometry, CapsuleGeometry):
-        # 胶囊 = 线段 ⊕ 球：先把方向压到线段的某个端点，再叠加球的支撑
-        half_height = 0.5 * geometry.height
-        end_z = half_height if direction[2] >= 0.0 else -half_height
-        if length <= _EPS:
-            return (0.0, 0.0, end_z)
-        scale = geometry.radius / length
-        return (
-            direction[0] * scale,
-            direction[1] * scale,
-            end_z + direction[2] * scale,
-        )
-
-    raise TypeError(f"不支持支撑映射的几何类型：{type(geometry).__name__}")
+    return geometry.support(direction)
 
 
 def support_world(body, direction) -> tuple[float, float, float]:
