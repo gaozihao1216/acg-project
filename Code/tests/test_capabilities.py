@@ -207,6 +207,46 @@ def test_pair_support() -> tuple[bool, str]:
     )
 
 
+def test_dispatch_table_matches_capabilities() -> tuple[bool, str]:
+    """窄相**分派表**与能力矩阵必须逐格对齐（两个方向都要查）。
+
+    这是本文件里最要紧的一条。以前"支持哪一对几何"写在两个地方——分派代码里
+    一串 ``isinstance``，和能力矩阵里一份声明——两份必须同步，而没人会记得同步。
+    漏掉一处不会报错，只会让两个物体**静默互相穿过**，属于最难查的一类问题。
+
+    现在分派表里每个条目自带"我在矩阵里叫什么"，本测试逐格验证：
+
+    - 表里有的组合：函数名必须与矩阵一致
+    - 矩阵里有、表里没有的组合：必须落到 GJK/EPA 兜底，且矩阵也必须这么写
+
+    复合体不查：它在 ``_collide_pair`` 里逐部件展开，压根不经过这张表。
+    """
+    from src.physics.narrowphase import _PAIR_DISPATCH
+
+    fallback_name = "collide_gjk"
+    problems = []
+    checked = 0
+
+    for kind_a, kind_b in capabilities.all_pairs():
+        declared = capabilities.narrowphase_function(kind_a, kind_b)
+        if declared is None or "compound" in (kind_a, kind_b):
+            continue
+        # 双向都要成立：算法不应该依赖调用方把谁放在前面
+        for first, second in ((kind_a, kind_b), (kind_b, kind_a)):
+            entry = _PAIR_DISPATCH.get((first, second))
+            resolved = entry[0] if entry is not None else fallback_name
+            checked += 1
+            if resolved != declared:
+                problems.append(
+                    f"{first}-{second}：矩阵={declared} 分派={resolved}"
+                )
+
+    return not problems, (
+        "，".join(problems) if problems
+        else f"{checked} 个方向的分派与矩阵名称一致（未覆盖的组合统一走 {fallback_name}）"
+    )
+
+
 def _pair_toi(kind_a: str, kind_b: str):
     """构造"必然相撞"的构型，返回 ``body_toi`` 的两个方向结果。
 
@@ -408,10 +448,11 @@ CHECKS = [
     ("2. 表里的函数名都存在", test_implementation_functions_exist),
     ("3. 单几何支持判据与表一致", test_single_geometry_support),
     ("4. 物体对窄相与表一致", test_pair_support),
-    ("5. 物体对 TOI 与表一致（双向）", test_pair_toi_matches_table),
-    ("6. 地面 TOI 与表一致", test_ground_toi_matches_table),
-    ("7. 未支持几何在加载阶段被拒绝", test_unsupported_rejected_at_load),
-    ("8. 文档生成块与表逐字一致", test_docs_block_matches_table),
+    ("5. 分派表与矩阵逐格对齐", test_dispatch_table_matches_capabilities),
+    ("6. 物体对 TOI 与表一致（双向）", test_pair_toi_matches_table),
+    ("7. 地面 TOI 与表一致", test_ground_toi_matches_table),
+    ("8. 未支持几何在加载阶段被拒绝", test_unsupported_rejected_at_load),
+    ("9. 文档生成块与表逐字一致", test_docs_block_matches_table),
 ]
 
 

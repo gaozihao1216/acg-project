@@ -79,9 +79,6 @@ from .sat import collide_box_box
 #: 且彼此冗余（法向完全相同），因此按穿透深度取最深的 4 个。
 MAX_BOX_GROUND_POINTS = 4
 
-#: 侧面或端帽是曲面的几何：没有有限 SAT 轴集合，窄相必须走 GJK/EPA。
-_CURVED = (CylinderGeometry, CapsuleGeometry)
-
 #: 复合体-地面的接触点数上限（按深度挑最深的）。见 collide_compound_ground。
 _MAX_COMPOUND_GROUND_POINTS = 16
 
@@ -615,88 +612,138 @@ def collide_hull_ground(
     return points
 
 
+# ---------------------------------------------------------------------------
+# 物体对分派表
+# ---------------------------------------------------------------------------
+#
+# 以前这里是一串 isinstance 分支，于是"支持哪一对几何"写在两个地方：分派代码
+# 里一份，``capabilities.NARROWPHASE_IMPL`` 里一份。两份必须同步，而没人会记得
+# 同步——加一种几何时漏掉一处，症状是"矩阵说支持、实际静默不产生接触"，也就是
+# 两个物体互相穿过。
+#
+# 现在分派表是唯一实现，能力矩阵是唯一声明，两者由 ``test_capabilities`` 强制
+# 对齐：表里出现的组合，其函数名必须与矩阵声明的名字一致；矩阵里有而表里没有
+# 的组合，必须落在 GJK/EPA 兜底上（矩阵也正是这么写的）。
+#
+# 表里只放**值得特判**的组合——闭式解或 SAT 能给出比 GJK 更准或更便宜的结果。
+# 其余一律兜底，于是新增一种凸体只要实现 ``support()``，不用碰这个文件。
+
+
+def _sphere_sphere_pair(body_a, body_b) -> list[ContactPoint]:
+    point = collide_sphere_sphere(body_a, body_b)
+    return [point] if point is not None else []
+
+
+def _flipped(point: ContactPoint) -> ContactPoint:
+    """把接触点法向取反，用于"天然返回 b→a"的函数。
+
+    ``feature_id`` 一并带过去：暖启动的匹配键，丢了它会让缓存永远命不中。
+    """
+    return ContactPoint(
+        position=point.position,
+        normal=vec3.scale(point.normal, -1.0),
+        penetration=point.penetration,
+        feature_id=point.feature_id,
+    )
+
+
+def _box_sphere_pair(body_a, body_b) -> list[ContactPoint]:
+    """a=盒、b=球。``collide_sphere_box`` 返回"盒→球"，正好是 a→b。"""
+    point = collide_sphere_box(body_b, body_a)
+    return [point] if point is not None else []
+
+
+def _sphere_box_pair(body_a, body_b) -> list[ContactPoint]:
+    """a=球、b=盒。返回值天然是"盒→球" = b→a，取反。"""
+    point = collide_sphere_box(body_a, body_b)
+    return [_flipped(point)] if point is not None else []
+
+
+def _hull_sphere_pair(body_a, body_b) -> list[ContactPoint]:
+    """a=凸包、b=球：``collide_sphere_hull`` 返回 hull→sphere，正是 a→b。"""
+    point = collide_sphere_hull(body_b, body_a)
+    return [point] if point is not None else []
+
+
+def _sphere_hull_pair(body_a, body_b) -> list[ContactPoint]:
+    """a=球、b=凸包：返回值是 hull→sphere = b→a，取反。"""
+    point = collide_sphere_hull(body_a, body_b)
+    return [_flipped(point)] if point is not None else []
+
+
+#: 几何类型 -> 多面体构造器。用 ``type()`` 精确匹配而不是 ``isinstance``：
+#: 几何类都是叶子类，精确匹配更快，也避免子类被悄悄当成父类处理。
+_POLYTOPE_BUILDERS = {
+    BoxGeometry: lambda geometry, body: polytope_from_box(
+        geometry.size, body.position, body.orientation
+    ),
+    ConvexHullGeometry: lambda geometry, body: polytope_from_hull(
+        geometry, body.position, body.orientation
+    ),
+}
+
+
+def _polytope_of(body) -> Polytope:
+    """把盒/凸包转成 SAT 用的多面体表示。"""
+    builder = _POLYTOPE_BUILDERS.get(type(body.geometry))
+    if builder is None:
+        raise TypeError(
+            f"{type(body.geometry).__name__} 不能转为多面体；"
+            f"只有 {tuple(cls.__name__ for cls in _POLYTOPE_BUILDERS)} 走 SAT 分派"
+        )
+    return builder(body.geometry, body)
+
+
+def _polytope_pair(body_a, body_b) -> list[ContactPoint]:
+    """盒/凸包之间的广义 SAT + 流形裁剪，法向天然是 a→b。"""
+    return collide_polytopes(_polytope_of(body_a), _polytope_of(body_b))
+
+
+#: (几何 A, 几何 B) -> (能力矩阵里声明的函数名, 实际分派函数)。
+#:
+#: 键是**有序对**：非对称组合（球-盒）写两条，各自负责自己的法向方向。
+#: 不在分派时做一次"谁是球"的换序判断——那等于把 isinstance 换个马甲。
+_PAIR_DISPATCH = {
+    ("sphere", "sphere"): ("collide_sphere_sphere", _sphere_sphere_pair),
+    ("sphere", "box"): ("collide_sphere_box", _sphere_box_pair),
+    ("box", "sphere"): ("collide_sphere_box", _box_sphere_pair),
+    ("sphere", "hull"): ("collide_sphere_hull", _sphere_hull_pair),
+    ("hull", "sphere"): ("collide_sphere_hull", _hull_sphere_pair),
+    ("box", "box"): ("collide_box_box", collide_box_box),
+    ("box", "hull"): ("collide_polytopes", _polytope_pair),
+    ("hull", "box"): ("collide_polytopes", _polytope_pair),
+    ("hull", "hull"): ("collide_polytopes", _polytope_pair),
+}
+
+
 def _collide_points(body_a, body_b) -> list[ContactPoint]:
-    """按几何类型分派到具体窄相函数，返回接触点（不含材质、不含流形）。
+    """查表分派；表里没有的组合一律走 GJK/EPA 兜底。
 
     参数是"像刚体的东西"：真实 ``RigidBody``，或复合体展开出的 ``PartView``。
     因此这里只允许读 ``geometry`` / ``position`` / ``orientation``。
 
-    法向一律调整为"从 a 指向 b"，因此分派时可能需要取反
-    （``collide_sphere_box`` 天然返回"盒指向球"）。
+    法向一律**从 body_a 指向 body_b**：表里每个非对称组合写了两条，各自处理
+    取反，所以这里没有任何方向判断。
+
+    兜底的意义
+    ----------
+    曲面体（柱、胶囊）没有有限 SAT 轴集合，圆锥、圆台、椭球、球冠同理；它们
+    全部落在 ``collide_gjk`` 上。于是"加一种凸体"的代价从 O(已有几何数) 个
+    窄相函数降到 0——只要它有 ``support()``。
     """
-    geometry_a = body_a.geometry
-    geometry_b = body_b.geometry
+    kind_a = capabilities.kind_of(body_a.geometry)
+    kind_b = capabilities.kind_of(body_b.geometry)
+    if kind_a is None or kind_b is None:
+        raise TypeError(
+            f"几何类型未登记到能力矩阵，无法分派窄相："
+            f"{type(body_a.geometry).__name__} / {type(body_b.geometry).__name__}"
+        )
 
-    a_is_box = isinstance(geometry_a, BoxGeometry)
-    b_is_box = isinstance(geometry_b, BoxGeometry)
-    a_is_hull = isinstance(geometry_a, ConvexHullGeometry)
-    b_is_hull = isinstance(geometry_b, ConvexHullGeometry)
+    entry = _PAIR_DISPATCH.get((kind_a, kind_b))
+    if entry is not None:
+        return entry[1](body_a, body_b)
 
-    points: list[ContactPoint] = []
-
-    # 侧面是曲面的几何（柱/胶囊）没有有限 SAT 轴集合，一律走 GJK/EPA。
-    # 放在最前面：曲面体既不是盒也不是凸包，任何后续分支都不适用。
-    if isinstance(geometry_a, _CURVED) or isinstance(geometry_b, _CURVED):
-        points = collide_gjk(body_a, body_b)
-    # 凸包参与的组合优先处理：一律走广义 SAT，法向天然是 a→b
-    elif a_is_hull or b_is_hull:
-        if a_is_hull and b_is_hull:
-            points = collide_polytopes(
-                polytope_from_hull(geometry_a, body_a.position, body_a.orientation),
-                polytope_from_hull(geometry_b, body_b.position, body_b.orientation),
-            )
-        elif a_is_hull and b_is_box:
-            points = collide_polytopes(
-                polytope_from_hull(geometry_a, body_a.position, body_a.orientation),
-                polytope_from_box(geometry_b.size, body_b.position, body_b.orientation),
-            )
-        elif a_is_box and b_is_hull:
-            points = collide_polytopes(
-                polytope_from_box(geometry_a.size, body_a.position, body_a.orientation),
-                polytope_from_hull(geometry_b, body_b.position, body_b.orientation),
-            )
-        elif a_is_hull:
-            # 凸包(a) - 球(b)：返回 hull→sphere，正是 a→b
-            point = collide_sphere_hull(body_b, body_a)
-            if point is not None:
-                points = [point]
-        else:
-            # 球(a) - 凸包(b)：返回 hull→sphere，需要取反成 a→b
-            point = collide_sphere_hull(body_a, body_b)
-            if point is not None:
-                points = [
-                    ContactPoint(
-                        position=point.position,
-                        normal=vec3.scale(point.normal, -1.0),
-                        penetration=point.penetration,
-                        feature_id=point.feature_id,
-                    )
-                ]
-    elif a_is_box and b_is_box:
-        # 盒-盒：SAT + 流形裁剪，返回 0–4 个点，法向已经是 a→b
-        points = collide_box_box(body_a, body_b)
-    elif not a_is_box and not b_is_box:
-        point = collide_sphere_sphere(body_a, body_b)
-        if point is not None:
-            points = [point]
-    elif a_is_box:
-        # 盒(a) - 球(b)：天然法向就是 a→b
-        point = collide_sphere_box(body_b, body_a)
-        if point is not None:
-            points = [point]
-    else:
-        # 球(a) - 盒(b)：天然法向是 b→a，需要取反
-        point = collide_sphere_box(body_a, body_b)
-        if point is not None:
-            points = [
-                ContactPoint(
-                    position=point.position,
-                    normal=vec3.scale(point.normal, -1.0),
-                    penetration=point.penetration,
-                )
-            ]
-
-    return points
+    return collide_gjk(body_a, body_b)
 
 
 #: 复合体特征 ID 的命名空间步长。各部件的 ID 都小于它（凸包最大约 3e5），
