@@ -659,35 +659,67 @@ def body_toi(
     return _dispatch_toi(body_a, body_b, max_time, cache)
 
 
+def _sphere_pair_toi(
+    body_a: RigidBody,
+    body_b: RigidBody,
+    max_time: float,
+    cache: dict | None = None,
+) -> float | None:
+    """``sphere_sphere_toi`` 的表格化包装（它不需要 cache，签名对齐而已）。"""
+    return sphere_sphere_toi(body_a, body_b, max_time)
+
+
+#: 物体对 TOI 分派表。键按 :func:`capabilities.pair_key` 排序，与能力矩阵同一套
+#: 写法；值是 ``(函数, 球是否必须在第一个参数)``。
+#:
+#: 表里只放有**专属推导**的组合：球的一元二次、球到多面体的最近点、多面体之间的
+#: SAT 轴推进。其余（柱、胶囊、圆锥、圆台、椭球、球冠）统一走
+#: ``curved_pair_toi``——GJK 距离 + 保守推进，只依赖支撑映射，所以加图元不写代码。
+#:
+#: 第二个元素不能省：``sphere_hull_toi`` 的推导以球为第一人称（球心到多面体最近
+#: 点），参数顺序反了不会报错，会算出一个错误的间隙——这正是最该被表格钉住的那类
+#: 隐含前提。
+_PAIR_TOI_DISPATCH = {
+    ("sphere", "sphere"): (_sphere_pair_toi, False),
+    ("sphere", "box"): (sphere_hull_toi, True),
+    ("sphere", "hull"): (sphere_hull_toi, True),
+    ("box", "box"): (hull_hull_toi, False),
+    ("box", "hull"): (hull_hull_toi, False),
+    ("hull", "hull"): (hull_hull_toi, False),
+}
+
+
 def _dispatch_toi(
     body_a: RigidBody,
     body_b: RigidBody,
     max_time: float,
     cache: dict | None = None,
 ) -> float | None:
-    """按几何类型分派，**不做**包围球预判。
+    """查表分派，**不做**包围球预判；表里没有的组合一律走保守推进。
 
-    单独拆出来是给 :func:`earliest_toi` 用的：那里已经把同一个判断内联进了内层
+    单独拆出来是给 :func:`earliest_toi` 用的：那里已经把包围球判断内联进了内层
     循环（省掉一次函数调用），再走一遍 :func:`may_collide` 属于重复计算。
+    所以这里的类型查表用 O(1) 的精确类型字典，而不是线性 ``isinstance`` 扫描。
     """
-    a_is_sphere = isinstance(body_a.geometry, SphereGeometry)
-    b_is_sphere = isinstance(body_b.geometry, SphereGeometry)
-    a_is_curved = isinstance(body_a.geometry, _CURVED)
-    b_is_curved = isinstance(body_b.geometry, _CURVED)
+    kind_a = capabilities.kind_of_exact(body_a.geometry)
+    kind_b = capabilities.kind_of_exact(body_b.geometry)
+    if kind_a is None or kind_b is None:
+        raise TypeError(
+            f"几何类型未登记到能力矩阵，无法分派 TOI："
+            f"{type(body_a.geometry).__name__} / {type(body_b.geometry).__name__}"
+        )
 
-    if isinstance(body_a.geometry, CompoundGeometry) or isinstance(
-        body_b.geometry, CompoundGeometry
-    ):
+    if kind_a == "compound" or kind_b == "compound":
         return compound_pair_toi(body_a, body_b, max_time, cache)
-    if a_is_curved or b_is_curved:
+
+    entry = _PAIR_TOI_DISPATCH.get(capabilities.pair_key(kind_a, kind_b))
+    if entry is None:
         return curved_pair_toi(body_a, body_b, max_time, cache)
-    if a_is_sphere and b_is_sphere:
-        return sphere_sphere_toi(body_a, body_b, max_time)
-    if a_is_sphere:
-        return sphere_hull_toi(body_a, body_b, max_time, cache)
-    if b_is_sphere:
-        return sphere_hull_toi(body_b, body_a, max_time, cache)
-    return hull_hull_toi(body_a, body_b, max_time, cache)
+
+    handler, sphere_first = entry
+    if sphere_first and kind_a != "sphere":
+        return handler(body_b, body_a, max_time, cache)
+    return handler(body_a, body_b, max_time, cache)
 
 
 def _sphere_ground_toi(

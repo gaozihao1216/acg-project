@@ -198,27 +198,41 @@ def test_ground_dispatch_covers_capability_table() -> tuple[bool, str]:
     # 复合体不在表里：它在 detect_contacts 里就被逐部件展开，压根不会走到这张表
     declared = set(capabilities.GROUND_IMPL) - {"compound"}
     dispatched = set(_GROUND_DISPATCH)
-    missing = declared - dispatched
+
+    # 表里有、矩阵没有 → 表在声称一个矩阵不认的能力，错
     extra = dispatched - declared
-    ok = not missing and not extra
+    # 矩阵有、表里没有 → 允许，但矩阵必须声明它由通用解承担
+    generic = declared - dispatched
+    wrongly_generic = [
+        kind
+        for kind in generic
+        if capabilities.GROUND_IMPL[kind][0] != "collide_convex_ground"
+    ]
+
+    ok = not extra and not wrongly_generic
     return ok, (
-        f"矩阵 {len(declared)} 种（不含复合体）、分派表 {len(dispatched)} 种；"
-        f"缺失={sorted(missing) or '无'}，多余={sorted(extra) or '无'}"
+        f"矩阵 {len(declared)} 种（不含复合体），专属分派 {len(dispatched)} 种，"
+        f"通用解承担 {sorted(generic)}；"
+        f"多余={sorted(extra) or '无'}，声明不符={sorted(wrongly_generic) or '无'}"
     )
 
 
-def test_unregistered_geometry_falls_back_to_generic() -> tuple[bool, str]:
-    """未登记能力矩阵的几何走通用解，而不是静默返回空。
+def test_parametric_kinds_use_generic_ground() -> tuple[bool, str]:
+    """四个参数化图元已在能力矩阵里，但地面**没有**专属函数，由通用解承担。
 
-    四个新图元现在还没进能力矩阵（第 6 步才接），但它们已经能算出地面接触——
-    这正是"通用解"要买到的东西。若这里返回空列表，新图元就会无声地穿过地面。
+    这条钉住的是设计意图：它们能落地，但不是因为给每种几何补了一个地面函数，
+    而是因为支撑特征解。若哪天有人往 ``_GROUND_DISPATCH`` 里给圆锥加了一条，
+    这里会失败——那时应该先想清楚"为什么通用解不够"，而不是顺手加分支。
     """
     cone = ConeGeometry(0.3, 1.2)
     body = make_body(cone, 0.2)
     points = _part_ground_points(body, GROUND)
     kind = capabilities.kind_of(cone)
-    return kind is None and len(points) == 4, (
-        f"能力矩阵种类={kind}（应为 None），通用解给出 {len(points)} 点"
+    specialized = sorted(kind for kind in ("cone", "frustum", "ellipsoid", "spherical_cap") if kind in _GROUND_DISPATCH)
+    ok = kind == "cone" and not specialized and len(points) == 4
+    return ok, (
+        f"能力矩阵种类={kind}，地面专属分支={specialized or '无'}，"
+        f"通用解给出 {len(points)} 点"
     )
 
 
@@ -327,6 +341,64 @@ def test_cone_compound_falls_and_rests() -> tuple[bool, str]:
     )
 
 
+def test_standalone_parametric_scene_loads() -> tuple[bool, str]:
+    """单独的圆锥/圆台/椭球/球冠现在能**直接**写进场景并跑起来。
+
+    这是第 6 步的验收点：把四种图元接进能力矩阵之后，加载阶段的闸门（``is_supported``）
+    才会放行它们。在此之前它们只能藏在组合体里，因为组合体本身是已支持的类型。
+
+    四种几何都从同一高度落下：末速度应接近零、峰值穿透 < 1 mm。
+    """
+    from src.physics.world import PhysicsWorld
+    from src.scene.scene_spec import SceneSpec
+
+    results = []
+    for label, geometry in (
+        ("圆锥", {"type": "cone", "radius": 0.25, "height": 0.6}),
+        ("圆台", {"type": "frustum", "bottom_radius": 0.28, "top_radius": 0.1, "height": 0.5}),
+        ("椭球", {"type": "ellipsoid", "radii": [0.3, 0.24, 0.2]}),
+        ("球冠", {"type": "spherical_cap", "radius": 0.3, "height": 0.3}),
+    ):
+        scene = SceneSpec.from_dict(
+            {
+                "name": f"standalone_{label}",
+                "objects": [
+                    {
+                        "name": "probe",
+                        "geometry": geometry,
+                        "transform": {"position": [0.0, 0.0, 0.8]},
+                        "mass": 1.0,
+                    }
+                ],
+                "simulation": {
+                    "enabled": True,
+                    "physics_dt": 1.0 / 240.0,
+                    "substeps": 3,
+                    "iterations": 8,
+                    "duration": 1.2,
+                },
+            }
+        )
+        world = PhysicsWorld.from_scene(scene)
+        body = world.bodies[0]
+        peak = 0.0
+        for _ in range(int(round(1.2 / scene.simulation.physics_dt))):
+            world.step()
+            peak = max(peak, world.max_penetration())
+        results.append((label, body.speed(), body.position[2], peak))
+
+    failures = [
+        f"{label} 末速 {speed:.4f} / z={z:.3f} / 穿透 {peak * 1000:.2f}mm"
+        for label, speed, z, peak in results
+        if speed > 1e-3 or peak > 1e-3 or z <= 0.0
+    ]
+    return not failures, (
+        "四种图元都能独立加载并静止"
+        if not failures
+        else "；".join(failures)
+    )
+
+
 # ---------------------------------------------------------------------------
 # 驱动
 # ---------------------------------------------------------------------------
@@ -338,9 +410,10 @@ CASES = [
     ("4. 圆台：两个端面都能 4 点", test_frustum_ground_both_faces),
     ("5. 椭球 1 点、球冠面接触 4 点", test_ellipsoid_and_cap_ground),
     ("6. 地面分派表覆盖能力矩阵", test_ground_dispatch_covers_capability_table),
-    ("7. 未登记几何回落到通用解", test_unregistered_geometry_falls_back_to_generic),
+    ("7. 参数化图元由通用解承担地面", test_parametric_kinds_use_generic_ground),
     ("8. 圆锥的地面 TOI 保守可用", test_cone_ground_toi_is_usable),
     ("9. 新图元端到端：落地并静止", test_cone_compound_falls_and_rests),
+    ("10. 新图元可直接写进场景", test_standalone_parametric_scene_loads),
 ]
 
 

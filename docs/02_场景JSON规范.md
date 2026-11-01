@@ -122,10 +122,21 @@
 | `sphere` | `radius` | 半径 |
 | `cylinder` | `radius`, `height` | 轴线沿局部 **Z**，底面在 -h/2（碰撞走 GJK/EPA） |
 | `capsule` | `radius`, `height` | `height` 只算**中间圆柱段**，总高 = height + 2r（同上） |
+| `cone` | `radius`, `height` | 实心圆锥，顶点朝 **+Z**（同上） |
+| `frustum` | `bottom_radius`, `top_radius`, `height` | 实心圆台；任一端的半径可写 0（退化成圆锥） |
+| `ellipsoid` | `radii: [a, b, c]` | 三个半轴 |
+| `spherical_cap` | `radius`, `height` | 球冠；`height = radius` 即半球，`= 2*radius` 退化为整球 |
 | `hull` | `points: [[x,y,z], ...]`，可选 `max_faces`（默认 64） | **任意凸多面体**：由点集求凸包 |
+| `compound` | `overlap`（必填）+ `parts: [...]` | 若干部件的并集，见下文 |
 
 尺寸单位是**米**，且**就是最终物理尺寸**。质量、惯量都直接用它算，
 不读取 `transform.scale`。
+
+> **质心在局部原点。** 圆锥、圆台、球冠的质心并不在底面中心，构造时形状会被整体
+> 平移，让质心落在原点（凸包、组合体也这么做）。所以圆锥的顶点在 `z = +3h/4`、
+> 底面在 `z = -h/4`；球冠的底面在 `z = -3r/8`（半球时）。
+> 这不是约定俗成的小事：`RigidBody.inertia_local` 是关于局部原点的惯量，若质心
+> 不在原点，物体会绕一个偏心的点旋转——不报错，表现为甩尾。
 
 #### `hull` 的两条约定
 
@@ -139,8 +150,36 @@
    所以把一个 `hull` 放在 `[0,0,2]`，它悬在空中的位置由**质心**决定。
 
 `max_faces` 是规模保护：广义 SAT 的棱-棱轴数是 `E²`，超过 64 面（约 96 条棱 =
-9216 条轴）会在**加载阶段**报错。碰撞代理应当用粗网格，通常 8–32 面足够；凹体
-必须先用凸包近似，或用多个凸块拼（组合体尚未实现）。
+9216 条轴）会在**加载阶段**报错。碰撞代理应当用粗网格，通常 8–32 面足够。凹体
+有两条路：用 `compound` 把若干凸块拼起来，或者用凸包外近似（会填平凹槽）。
+
+#### `compound` 的三条约定
+
+```json
+{"type": "compound",
+ "overlap": "disjoint",
+ "parts": [
+   {"geometry": {"type": "box", "size": [0.6, 0.2, 0.2]},
+    "position": [-0.3, 0.0, 0.0], "orientation": [1, 0, 0, 0]},
+   {"geometry": {"type": "sphere", "radius": 0.15}, "position": [0.3, 0.0, 0.0]}
+ ]}
+```
+
+1. **`overlap` 是必填字段**，只能取 `"disjoint"` 或 `"overlap"`，填错或漏填都会在
+   加载阶段报错。它声明的是部件的重叠性，只有建模的人知道，程序不去猜：
+   - `"disjoint"`：部件互不重叠。质量属性走解析求和（部件张量旋转 + 平行轴定理），
+     精确、零开销。适合哑铃、T 形支架这类由离散件拼起来的物体。
+   - `"overlap"`：部件可能有重叠（薄壳贴配重、球冠拼胶囊、圆柱插底座）。走并集采样：
+     在包围盒内用 Halton 低差异序列撒点，落在任一部件内的点才算材料，体积/质心/惯量
+     都由这些点估计。**体积因此是并集体积**，比各部件之和小；漏选这个模式会把重叠区
+     算两遍，惯量偏大而不报错。
+   - 采样只在**加载期**做一次，之后固定下来，与帧率无关；序列是确定性的，
+     同一份 JSON 每次得到逐位相同的结果。默认 10 万点（体积误差约 0.3%），
+     可用 `samples` 调大换精度。
+2. **`position` 是相对组合体坐标原点的位姿**，与 `hull` 一样，构造时会按体积质心
+   平移、并旋到惯量主轴系，用户不需要处理。
+3. **部件不要嵌套 `compound`**：复合体在窄相里是"展开成部件对"的，部件再是复合体
+   会让展开失去意义，碰撞时会抛 `TypeError`。
 
 
 ### 5.2 `transform`
@@ -279,21 +318,55 @@ B 再撞 C），一次性检测会把它们当成"同时接触"。开启 `use_to
 | 球 | 凸包 | ✅ `collide_sphere_hull` | ✅ `sphere_hull_toi` | 保守（球心到多面体最近点 + 该处法向） |
 | 球 | 柱 | ✅ `collide_gjk` | ✅ `curved_pair_toi` | 保守（GJK 距离 + 保守推进） |
 | 球 | 胶囊 | ✅ `collide_gjk` | ✅ `curved_pair_toi` | 保守（GJK 距离 + 保守推进） |
+| 球 | 圆锥 | ✅ `collide_gjk` | ✅ `curved_pair_toi` | 保守（GJK 距离 + 保守推进） |
+| 球 | 圆台 | ✅ `collide_gjk` | ✅ `curved_pair_toi` | 保守（GJK 距离 + 保守推进） |
+| 球 | 椭球 | ✅ `collide_gjk` | ✅ `curved_pair_toi` | 保守（GJK 距离 + 保守推进） |
+| 球 | 球冠 | ✅ `collide_gjk` | ✅ `curved_pair_toi` | 保守（GJK 距离 + 保守推进） |
 | 球 | 组合体 | ✅ `collide_compound` | ✅ `compound_pair_toi` | 保守（逐部件取最早） |
 | 盒 | 盒 | ✅ `collide_box_box` | ✅ `hull_hull_toi` | 保守（SAT 候选轴逐条推进） |
 | 盒 | 凸包 | ✅ `collide_polytopes` | ✅ `hull_hull_toi` | 保守（SAT 候选轴逐条推进） |
 | 盒 | 柱 | ✅ `collide_gjk` | ✅ `curved_pair_toi` | 保守（GJK 距离 + 保守推进） |
 | 盒 | 胶囊 | ✅ `collide_gjk` | ✅ `curved_pair_toi` | 保守（GJK 距离 + 保守推进） |
+| 盒 | 圆锥 | ✅ `collide_gjk` | ✅ `curved_pair_toi` | 保守（GJK 距离 + 保守推进） |
+| 盒 | 圆台 | ✅ `collide_gjk` | ✅ `curved_pair_toi` | 保守（GJK 距离 + 保守推进） |
+| 盒 | 椭球 | ✅ `collide_gjk` | ✅ `curved_pair_toi` | 保守（GJK 距离 + 保守推进） |
+| 盒 | 球冠 | ✅ `collide_gjk` | ✅ `curved_pair_toi` | 保守（GJK 距离 + 保守推进） |
 | 盒 | 组合体 | ✅ `collide_compound` | ✅ `compound_pair_toi` | 保守（逐部件取最早） |
 | 凸包 | 凸包 | ✅ `collide_polytopes` | ✅ `hull_hull_toi` | 保守（SAT 候选轴逐条推进） |
 | 凸包 | 柱 | ✅ `collide_gjk` | ✅ `curved_pair_toi` | 保守（GJK 距离 + 保守推进） |
 | 凸包 | 胶囊 | ✅ `collide_gjk` | ✅ `curved_pair_toi` | 保守（GJK 距离 + 保守推进） |
+| 凸包 | 圆锥 | ✅ `collide_gjk` | ✅ `curved_pair_toi` | 保守（GJK 距离 + 保守推进） |
+| 凸包 | 圆台 | ✅ `collide_gjk` | ✅ `curved_pair_toi` | 保守（GJK 距离 + 保守推进） |
+| 凸包 | 椭球 | ✅ `collide_gjk` | ✅ `curved_pair_toi` | 保守（GJK 距离 + 保守推进） |
+| 凸包 | 球冠 | ✅ `collide_gjk` | ✅ `curved_pair_toi` | 保守（GJK 距离 + 保守推进） |
 | 凸包 | 组合体 | ✅ `collide_compound` | ✅ `compound_pair_toi` | 保守（逐部件取最早） |
 | 柱 | 柱 | ✅ `collide_gjk` | ✅ `curved_pair_toi` | 保守（GJK 距离 + 保守推进） |
 | 柱 | 胶囊 | ✅ `collide_gjk` | ✅ `curved_pair_toi` | 保守（GJK 距离 + 保守推进） |
+| 柱 | 圆锥 | ✅ `collide_gjk` | ✅ `curved_pair_toi` | 保守（GJK 距离 + 保守推进） |
+| 柱 | 圆台 | ✅ `collide_gjk` | ✅ `curved_pair_toi` | 保守（GJK 距离 + 保守推进） |
+| 柱 | 椭球 | ✅ `collide_gjk` | ✅ `curved_pair_toi` | 保守（GJK 距离 + 保守推进） |
+| 柱 | 球冠 | ✅ `collide_gjk` | ✅ `curved_pair_toi` | 保守（GJK 距离 + 保守推进） |
 | 柱 | 组合体 | ✅ `collide_compound` | ✅ `compound_pair_toi` | 保守（逐部件取最早） |
 | 胶囊 | 胶囊 | ✅ `collide_gjk` | ✅ `curved_pair_toi` | 保守（GJK 距离 + 保守推进） |
+| 胶囊 | 圆锥 | ✅ `collide_gjk` | ✅ `curved_pair_toi` | 保守（GJK 距离 + 保守推进） |
+| 胶囊 | 圆台 | ✅ `collide_gjk` | ✅ `curved_pair_toi` | 保守（GJK 距离 + 保守推进） |
+| 胶囊 | 椭球 | ✅ `collide_gjk` | ✅ `curved_pair_toi` | 保守（GJK 距离 + 保守推进） |
+| 胶囊 | 球冠 | ✅ `collide_gjk` | ✅ `curved_pair_toi` | 保守（GJK 距离 + 保守推进） |
 | 胶囊 | 组合体 | ✅ `collide_compound` | ✅ `compound_pair_toi` | 保守（逐部件取最早） |
+| 圆锥 | 圆锥 | ✅ `collide_gjk` | ✅ `curved_pair_toi` | 保守（GJK 距离 + 保守推进） |
+| 圆锥 | 圆台 | ✅ `collide_gjk` | ✅ `curved_pair_toi` | 保守（GJK 距离 + 保守推进） |
+| 圆锥 | 椭球 | ✅ `collide_gjk` | ✅ `curved_pair_toi` | 保守（GJK 距离 + 保守推进） |
+| 圆锥 | 球冠 | ✅ `collide_gjk` | ✅ `curved_pair_toi` | 保守（GJK 距离 + 保守推进） |
+| 圆锥 | 组合体 | ✅ `collide_compound` | ✅ `compound_pair_toi` | 保守（逐部件取最早） |
+| 圆台 | 圆台 | ✅ `collide_gjk` | ✅ `curved_pair_toi` | 保守（GJK 距离 + 保守推进） |
+| 圆台 | 椭球 | ✅ `collide_gjk` | ✅ `curved_pair_toi` | 保守（GJK 距离 + 保守推进） |
+| 圆台 | 球冠 | ✅ `collide_gjk` | ✅ `curved_pair_toi` | 保守（GJK 距离 + 保守推进） |
+| 圆台 | 组合体 | ✅ `collide_compound` | ✅ `compound_pair_toi` | 保守（逐部件取最早） |
+| 椭球 | 椭球 | ✅ `collide_gjk` | ✅ `curved_pair_toi` | 保守（GJK 距离 + 保守推进） |
+| 椭球 | 球冠 | ✅ `collide_gjk` | ✅ `curved_pair_toi` | 保守（GJK 距离 + 保守推进） |
+| 椭球 | 组合体 | ✅ `collide_compound` | ✅ `compound_pair_toi` | 保守（逐部件取最早） |
+| 球冠 | 球冠 | ✅ `collide_gjk` | ✅ `curved_pair_toi` | 保守（GJK 距离 + 保守推进） |
+| 球冠 | 组合体 | ✅ `collide_compound` | ✅ `compound_pair_toi` | 保守（逐部件取最早） |
 | 组合体 | 组合体 | ✅ `collide_compound` | ✅ `compound_pair_toi` | 保守（逐部件取最早） |
 
 | 几何 | 窄相 | TOI | TOI 性质 |
@@ -303,6 +376,10 @@ B 再撞 C），一次性检测会把它们当成"同时接触"。开启 `use_to
 | 凸包 - 地面 | ✅ `collide_hull_ground` | ✅ `hull_ground_toi` | 精确（顶点解，含自转） |
 | 柱 - 地面 | ✅ `collide_cylinder_ground` | ✅ `curved_ground_toi` | 保守（端面圆周最低点 + 自转上界） |
 | 胶囊 - 地面 | ✅ `collide_capsule_ground` | ✅ `curved_ground_toi` | 保守（端球最低点 + 自转上界） |
+| 圆锥 - 地面 | ✅ `collide_convex_ground` | ✅ `curved_ground_toi` | 保守（支撑特征最低点 + 自转上界） |
+| 圆台 - 地面 | ✅ `collide_convex_ground` | ✅ `curved_ground_toi` | 保守（支撑特征最低点 + 自转上界） |
+| 椭球 - 地面 | ✅ `collide_convex_ground` | ✅ `curved_ground_toi` | 保守（支撑特征最低点 + 自转上界） |
+| 球冠 - 地面 | ✅ `collide_convex_ground` | ✅ `curved_ground_toi` | 保守（支撑特征最低点 + 自转上界） |
 | 组合体 - 地面 | ✅ `collide_compound_ground` | ✅ `compound_ground_toi` | 保守（逐部件取最早） |
 <!-- capabilities:end -->
 

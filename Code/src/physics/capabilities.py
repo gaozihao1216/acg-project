@@ -30,10 +30,14 @@ from ..geom.geometry import (
     BoxGeometry,
     CapsuleGeometry,
     CompoundGeometry,
+    ConeGeometry,
     ConvexHullGeometry,
     CylinderGeometry,
+    EllipsoidGeometry,
+    FrustumGeometry,
     GeometrySpec,
     SphereGeometry,
+    SphericalCapGeometry,
 )
 
 #: 文档里生成块的分隔标记。测试只认这两个标记之间的内容，其余部分自由撰写。
@@ -47,14 +51,34 @@ KIND_LABELS = {
     "hull": "凸包",
     "cylinder": "柱",
     "capsule": "胶囊",
+    "cone": "圆锥",
+    "frustum": "圆台",
+    "ellipsoid": "椭球",
+    "spherical_cap": "球冠",
     "compound": "组合体",
 }
 
 #: 已有窄相实现的几何种类。顺序决定文档表格的行序，改动时同步看输出。
-SUPPORTED_KINDS = ("sphere", "box", "hull", "cylinder", "capsule", "compound")
+#:
+#: 前五种是"棱柱/回转体"的老底子；中间四种是参数化曲面体（圆锥、圆台、椭球、
+#: 球冠），它们全部走支撑映射，因此不需要写任何新的物体对代码；组合体放在最后，
+#: 因为它是容器，键里带 compound 的格子都表示"展开成部件对"。
+SUPPORTED_KINDS = (
+    "sphere",
+    "box",
+    "hull",
+    "cylinder",
+    "capsule",
+    "cone",
+    "frustum",
+    "ellipsoid",
+    "spherical_cap",
+    "compound",
+)
 
 #: 只有几何、没有碰撞的几何种类。它们连窄相都没有，因此也不可能有 TOI。
-#: 现在为空：圆柱与胶囊接入 GJK/EPA 之后，全部几何都有窄相与 TOI。
+#: 现在为空：曲面体接入 GJK/EPA、参数化图元接入支撑特征之后，全部几何都有
+#: 窄相、TOI 与地面三套实现。
 UNSUPPORTED_KINDS = ()
 
 ALL_KINDS = SUPPORTED_KINDS + UNSUPPORTED_KINDS
@@ -65,6 +89,10 @@ _GEOMETRY_KIND = {
     ConvexHullGeometry: "hull",
     CylinderGeometry: "cylinder",
     CapsuleGeometry: "capsule",
+    ConeGeometry: "cone",
+    FrustumGeometry: "frustum",
+    EllipsoidGeometry: "ellipsoid",
+    SphericalCapGeometry: "spherical_cap",
     CompoundGeometry: "compound",
 }
 
@@ -93,12 +121,49 @@ NARROWPHASE_IMPL = {
     ("cylinder", "cylinder"): "collide_gjk",
     ("cylinder", "capsule"): "collide_gjk",
     ("capsule", "capsule"): "collide_gjk",
+    # 参数化曲面体（圆锥、圆台、椭球、球冠）与所有几何之间：一律 GJK + EPA。
+    # 它们没有有限 SAT 轴集合、也没有可枚举的顶点，但都有支撑映射，所以下面
+    # 30 个格子是**零代码**——新增图元时完全不需要碰窄相分派。
+    ("sphere", "cone"): "collide_gjk",
+    ("sphere", "frustum"): "collide_gjk",
+    ("sphere", "ellipsoid"): "collide_gjk",
+    ("sphere", "spherical_cap"): "collide_gjk",
+    ("box", "cone"): "collide_gjk",
+    ("box", "frustum"): "collide_gjk",
+    ("box", "ellipsoid"): "collide_gjk",
+    ("box", "spherical_cap"): "collide_gjk",
+    ("hull", "cone"): "collide_gjk",
+    ("hull", "frustum"): "collide_gjk",
+    ("hull", "ellipsoid"): "collide_gjk",
+    ("hull", "spherical_cap"): "collide_gjk",
+    ("cylinder", "cone"): "collide_gjk",
+    ("cylinder", "frustum"): "collide_gjk",
+    ("cylinder", "ellipsoid"): "collide_gjk",
+    ("cylinder", "spherical_cap"): "collide_gjk",
+    ("capsule", "cone"): "collide_gjk",
+    ("capsule", "frustum"): "collide_gjk",
+    ("capsule", "ellipsoid"): "collide_gjk",
+    ("capsule", "spherical_cap"): "collide_gjk",
+    ("cone", "cone"): "collide_gjk",
+    ("cone", "frustum"): "collide_gjk",
+    ("cone", "ellipsoid"): "collide_gjk",
+    ("cone", "spherical_cap"): "collide_gjk",
+    ("frustum", "frustum"): "collide_gjk",
+    ("frustum", "ellipsoid"): "collide_gjk",
+    ("frustum", "spherical_cap"): "collide_gjk",
+    ("ellipsoid", "ellipsoid"): "collide_gjk",
+    ("ellipsoid", "spherical_cap"): "collide_gjk",
+    ("spherical_cap", "spherical_cap"): "collide_gjk",
     # 组合体：展开成部件对后复用上面所有路径
     ("sphere", "compound"): "collide_compound",
     ("box", "compound"): "collide_compound",
     ("hull", "compound"): "collide_compound",
     ("cylinder", "compound"): "collide_compound",
     ("capsule", "compound"): "collide_compound",
+    ("cone", "compound"): "collide_compound",
+    ("frustum", "compound"): "collide_compound",
+    ("ellipsoid", "compound"): "collide_compound",
+    ("spherical_cap", "compound"): "collide_compound",
     ("compound", "compound"): "collide_compound",
 }
 
@@ -125,11 +190,46 @@ TOI_IMPL = {
     ("cylinder", "cylinder"): ("curved_pair_toi", "保守", "GJK 距离 + 保守推进"),
     ("cylinder", "capsule"): ("curved_pair_toi", "保守", "GJK 距离 + 保守推进"),
     ("capsule", "capsule"): ("curved_pair_toi", "保守", "GJK 距离 + 保守推进"),
+    # 参数化曲面体：同一条 GJK 距离 + 保守推进的路径，同样零代码
+    ("sphere", "cone"): ("curved_pair_toi", "保守", "GJK 距离 + 保守推进"),
+    ("sphere", "frustum"): ("curved_pair_toi", "保守", "GJK 距离 + 保守推进"),
+    ("sphere", "ellipsoid"): ("curved_pair_toi", "保守", "GJK 距离 + 保守推进"),
+    ("sphere", "spherical_cap"): ("curved_pair_toi", "保守", "GJK 距离 + 保守推进"),
+    ("box", "cone"): ("curved_pair_toi", "保守", "GJK 距离 + 保守推进"),
+    ("box", "frustum"): ("curved_pair_toi", "保守", "GJK 距离 + 保守推进"),
+    ("box", "ellipsoid"): ("curved_pair_toi", "保守", "GJK 距离 + 保守推进"),
+    ("box", "spherical_cap"): ("curved_pair_toi", "保守", "GJK 距离 + 保守推进"),
+    ("hull", "cone"): ("curved_pair_toi", "保守", "GJK 距离 + 保守推进"),
+    ("hull", "frustum"): ("curved_pair_toi", "保守", "GJK 距离 + 保守推进"),
+    ("hull", "ellipsoid"): ("curved_pair_toi", "保守", "GJK 距离 + 保守推进"),
+    ("hull", "spherical_cap"): ("curved_pair_toi", "保守", "GJK 距离 + 保守推进"),
+    ("cylinder", "cone"): ("curved_pair_toi", "保守", "GJK 距离 + 保守推进"),
+    ("cylinder", "frustum"): ("curved_pair_toi", "保守", "GJK 距离 + 保守推进"),
+    ("cylinder", "ellipsoid"): ("curved_pair_toi", "保守", "GJK 距离 + 保守推进"),
+    ("cylinder", "spherical_cap"): ("curved_pair_toi", "保守", "GJK 距离 + 保守推进"),
+    ("capsule", "cone"): ("curved_pair_toi", "保守", "GJK 距离 + 保守推进"),
+    ("capsule", "frustum"): ("curved_pair_toi", "保守", "GJK 距离 + 保守推进"),
+    ("capsule", "ellipsoid"): ("curved_pair_toi", "保守", "GJK 距离 + 保守推进"),
+    ("capsule", "spherical_cap"): ("curved_pair_toi", "保守", "GJK 距离 + 保守推进"),
+    ("cone", "cone"): ("curved_pair_toi", "保守", "GJK 距离 + 保守推进"),
+    ("cone", "frustum"): ("curved_pair_toi", "保守", "GJK 距离 + 保守推进"),
+    ("cone", "ellipsoid"): ("curved_pair_toi", "保守", "GJK 距离 + 保守推进"),
+    ("cone", "spherical_cap"): ("curved_pair_toi", "保守", "GJK 距离 + 保守推进"),
+    ("frustum", "frustum"): ("curved_pair_toi", "保守", "GJK 距离 + 保守推进"),
+    ("frustum", "ellipsoid"): ("curved_pair_toi", "保守", "GJK 距离 + 保守推进"),
+    ("frustum", "spherical_cap"): ("curved_pair_toi", "保守", "GJK 距离 + 保守推进"),
+    ("ellipsoid", "ellipsoid"): ("curved_pair_toi", "保守", "GJK 距离 + 保守推进"),
+    ("ellipsoid", "spherical_cap"): ("curved_pair_toi", "保守", "GJK 距离 + 保守推进"),
+    ("spherical_cap", "spherical_cap"): ("curved_pair_toi", "保守", "GJK 距离 + 保守推进"),
     ("sphere", "compound"): ("compound_pair_toi", "保守", "逐部件取最早"),
     ("box", "compound"): ("compound_pair_toi", "保守", "逐部件取最早"),
     ("hull", "compound"): ("compound_pair_toi", "保守", "逐部件取最早"),
     ("cylinder", "compound"): ("compound_pair_toi", "保守", "逐部件取最早"),
     ("capsule", "compound"): ("compound_pair_toi", "保守", "逐部件取最早"),
+    ("cone", "compound"): ("compound_pair_toi", "保守", "逐部件取最早"),
+    ("frustum", "compound"): ("compound_pair_toi", "保守", "逐部件取最早"),
+    ("ellipsoid", "compound"): ("compound_pair_toi", "保守", "逐部件取最早"),
+    ("spherical_cap", "compound"): ("compound_pair_toi", "保守", "逐部件取最早"),
     ("compound", "compound"): ("compound_pair_toi", "保守", "逐部件取最早"),
 }
 
@@ -146,6 +246,12 @@ GROUND_IMPL = {
     "hull": ("collide_hull_ground", "hull_ground_toi", "精确", "顶点解，含自转"),
     "cylinder": ("collide_cylinder_ground", "curved_ground_toi", "保守", "端面圆周最低点 + 自转上界"),
     "capsule": ("collide_capsule_ground", "curved_ground_toi", "保守", "端球最低点 + 自转上界"),
+    # 参数化曲面体没有专属地面函数：它们统一走 collide_convex_ground——支撑特征
+    # 裁剪 + 逐点深度，端面圆盘正对地面时自动给 4 点。TOI 复用保守的支撑点推进。
+    "cone": ("collide_convex_ground", "curved_ground_toi", "保守", "支撑特征最低点 + 自转上界"),
+    "frustum": ("collide_convex_ground", "curved_ground_toi", "保守", "支撑特征最低点 + 自转上界"),
+    "ellipsoid": ("collide_convex_ground", "curved_ground_toi", "保守", "支撑特征最低点 + 自转上界"),
+    "spherical_cap": ("collide_convex_ground", "curved_ground_toi", "保守", "支撑特征最低点 + 自转上界"),
     "compound": ("collide_compound_ground", "compound_ground_toi", "保守", "逐部件取最早"),
 }
 
@@ -166,6 +272,25 @@ def kind_of(geometry: GeometrySpec | None) -> str | None:
         if isinstance(geometry, cls):
             return kind
     return None
+
+
+#: 精确类型 -> 种类。``kind_of`` 用 ``isinstance`` 是为了容忍子类，代价是线性扫描；
+#: TOI 的内层循环是 O(N²)，每对物体都扫一遍十项字典不合算，所以另开一张 O(1) 表。
+_KIND_BY_TYPE = {cls: kind for cls, kind in _GEOMETRY_KIND.items()}
+
+
+def kind_of_exact(geometry: GeometrySpec | None) -> str | None:
+    """``kind_of`` 的 O(1) 版本：按**精确类型**查表，未命中再退回 ``isinstance``。
+
+    内层循环专用。命中时零扫描；将来若出现几何子类，会由兜底分支正确处理，
+    不会因为查表落空而静默变成"未支持"。
+    """
+    if geometry is None:
+        return None
+    kind = _KIND_BY_TYPE.get(type(geometry))
+    if kind is not None:
+        return kind
+    return kind_of(geometry)
 
 
 def pair_key(kind_a: str, kind_b: str) -> tuple[str, str]:

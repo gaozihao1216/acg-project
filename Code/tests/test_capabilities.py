@@ -37,9 +37,13 @@ from src.geom.geometry import (
     CapsuleGeometry,
     CompoundGeometry,
     CompoundPart,
+    ConeGeometry,
     ConvexHullGeometry,
     CylinderGeometry,
+    EllipsoidGeometry,
+    FrustumGeometry,
     SphereGeometry,
+    SphericalCapGeometry,
 )
 from src.physics import capabilities, narrowphase, toi as toi_module
 from src.physics.body import RigidBody
@@ -63,6 +67,16 @@ def make_geometry(kind: str):
         return CylinderGeometry(0.25, 0.6)
     if kind == "capsule":
         return CapsuleGeometry(0.25, 0.4)
+    # 参数化曲面体：尺寸都取 0.5 量级，与上面的球/盒/柱/胶囊相近，
+    # 这样 TOI 探测里"表面间隙 1 m"的起始距离对每种几何含义一致
+    if kind == "cone":
+        return ConeGeometry(0.25, 0.5)
+    if kind == "frustum":
+        return FrustumGeometry(0.25, 0.12, 0.5)
+    if kind == "ellipsoid":
+        return EllipsoidGeometry((0.3, 0.25, 0.2))
+    if kind == "spherical_cap":
+        return SphericalCapGeometry(0.25, 0.2)
     if kind == "compound":
         # 两个球拼成的哑铃：与球/盒/凸包/柱/胶囊都明显不同形
         piece = SphereGeometry(0.2)
