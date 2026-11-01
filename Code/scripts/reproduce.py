@@ -32,6 +32,10 @@
 
     # 只查几个
     python Code/scripts/reproduce.py --root results/w3 --only prism stack
+
+    # 规格变了（例如求解器行为改进）→ 刷新产物，然后再校验一遍
+    python Code/scripts/reproduce.py --root results/w3 --refresh
+    python Code/scripts/reproduce.py --root results/w3
 """
 
 from __future__ import annotations
@@ -245,6 +249,58 @@ def replay_poses(case: dict, target_root: str) -> tuple[bool, str]:
     return same, detail
 
 
+def refresh_case(case: dict, target_root: str) -> str:
+    """用重放结果覆盖真实产物（``--refresh`` 模式）。
+
+    什么时候需要：**规格变了**，旧产物本来就该变。比如加了暖启动之后，``stack``
+    的位姿序列必然不同——此时"不一致"不是 bug，而是"产物过期"。手工重跑命令
+    容易漏掉 ``*.poses.json``（它由第二条命令产出），所以这里一起处理。
+
+    实现上仍然先重放到临时目录再复制，避免半路失败把真实产物改成半成品。
+    """
+    name = case["name"]
+    output_dir = os.path.join(case["dir"], "output")
+    replayed_dir = os.path.join(target_root, name, "output")
+
+    updated = []
+    for entry in sorted(os.listdir(replayed_dir)):
+        if not entry.endswith(".json"):
+            continue
+        source = os.path.join(replayed_dir, entry)
+        target = os.path.join(output_dir, entry)
+        if os.path.isfile(target) and filecmp.cmp(source, target, shallow=False):
+            continue
+        shutil.copyfile(source, target)
+        updated.append(entry)
+
+    lines = [f"      产物：{'更新 ' + '、'.join(updated) if updated else '无需更新'}"]
+
+    # 位姿序列由 run_sim 产出，重放上面那条命令不会生成它，必须单独重跑
+    if case["schema"] == "scene_request/1":
+        scene_asset = os.path.join(output_dir, f"{name}.scene.json")
+        poses = os.path.join(output_dir, f"{name}.poses.json")
+        if os.path.isfile(poses):
+            completed = subprocess.run(
+                [
+                    sys.executable,
+                    os.path.join(_HERE, "run_sim.py"),
+                    "--scene-asset", scene_asset,
+                    "--out", poses,
+                ],
+                cwd=_PROJECT_ROOT,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+            )
+            lines.append(
+                "      位姿：重新生成" if completed.returncode == 0
+                else f"      位姿：失败（{(completed.stderr or '').strip().splitlines()[-1:] or '无输出'}）"
+            )
+
+    return "\n".join(lines)
+
+
 def compare(case: dict, target_root: str) -> tuple[bool, str]:
     """逐文件比对重放产物与原产物。"""
     if not case["produced"]:
@@ -313,6 +369,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--root", required=True, help="案例根目录（含 */input/request.json）")
     parser.add_argument("--only", nargs="+", default=None, help="只查这些案例")
     parser.add_argument("--keep", action="store_true", help="保留临时目录以便排查")
+    parser.add_argument(
+        "--refresh",
+        action="store_true",
+        help="用重放结果覆盖真实产物（规格变更后使用，不做比对）",
+    )
     args = parser.parse_args(argv)
 
     if not os.path.isdir(args.root):
@@ -346,6 +407,12 @@ def main(argv: list[str] | None = None) -> int:
             code, message = replay(case, target_root)
             if code != 0:
                 print(f"      重放失败（退出码 {code}）：{message}")
+                continue
+
+            if args.refresh:
+                print(refresh_case(case, target_root))
+                passed += 1
+                print("      ⇒ 已刷新（下次不带 --refresh 再跑一遍做校验）")
                 continue
 
             ok, detail = compare(case, target_root)

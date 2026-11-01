@@ -29,8 +29,13 @@ TEST_MODULES = [
     "test_broadphase",
     "test_massprops",
     "test_hull",
+    "test_curved",
+    "test_compound",
     "test_object_input",
     "test_asset",
+    "test_capabilities",
+    "test_evidence",
+    "test_warm_start",
 ]
 
 

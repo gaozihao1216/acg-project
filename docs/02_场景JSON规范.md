@@ -120,7 +120,7 @@
 |---|---|---|
 | `box` | `size: [sx, sy, sz]` | 三轴**全长**（不是半长） |
 | `sphere` | `radius` | 半径 |
-| `cylinder` | `radius`, `height` | 轴线沿局部 **Z**，底面在 -h/2（渲染支持，碰撞未接入） |
+| `cylinder` | `radius`, `height` | 轴线沿局部 **Z**，底面在 -h/2（碰撞走 GJK/EPA） |
 | `capsule` | `radius`, `height` | `height` 只算**中间圆柱段**，总高 = height + 2r（同上） |
 | `hull` | `points: [[x,y,z], ...]`，可选 `max_faces`（默认 64） | **任意凸多面体**：由点集求凸包 |
 
@@ -214,8 +214,9 @@ Phase 0 不参与渲染，只是先把这个字段解析好，避免以后改 JS
 |---|---|---|---|
 | `enabled` | bool | `false` | 关闭时 `run_sim.py` 会直接报错 |
 | `physics_dt` | number | `1/240` | 每个物理步的时长（秒） |
-| `substeps` | int | `2` | 每步内部再切分的子步数 |
-| `iterations` | int | `12` | 顺序冲量迭代次数 |
+| `substeps` | int | `3` | 每步内部再切分的子步数（缺省由 `docs/05` 的实测确定） |
+| `iterations` | int | `8` | 顺序冲量迭代次数。6–8 之后饱和，余量转给子步 |
+| `warm_start` | bool | `true` | 跨帧复用上一子步的法向累积冲量。低迭代时显著减小下沉；对照实验见 `docs/05` §8 |
 | `baumgarte` | number | `0.25` | 位置修正强度 0–1 |
 | `slop` | number | `0.002` | 允许的穿透容差（米） |
 | `restitution_threshold` | number | `1.0` | 低于此接近速度忽略恢复系数（m/s） |
@@ -264,18 +265,91 @@ Phase 0 不参与渲染，只是先把这个字段解析好，避免以后改 JS
 
 窄相只看得到"此刻已穿透"的物体。如果一个子步内先后发生多次碰撞（A 撞 B、
 B 再撞 C），一次性检测会把它们当成"同时接触"。开启 `use_toi_splitting` 后，
-求解器会在推进位置之前解析地算出**下一次接触的时刻**（球-球是一元二次方程，
-球-地面是一元一次），把子步切开，每段只解算此刻真正发生的接触。
+求解器会在推进位置之前解析地算出**下一次接触的时刻**，把子步切开，每段只解算
+此刻真正发生的接触。
 
-效果（`tests/test_toi_split.py`）：
+**覆盖范围**（下表由 `src/physics/capabilities.py` **生成**，不要手改；
+改能力表后跑 `python Code/scripts/sync_docs.py`）：
+
+<!-- capabilities:begin -->
+| 几何 A | 几何 B | 窄相 | TOI | TOI 性质 |
+|---|---|---|---|---|
+| 球 | 球 | ✅ `collide_sphere_sphere` | ✅ `sphere_sphere_toi` | 精确（一元二次方程取首次接触根） |
+| 球 | 盒 | ✅ `collide_sphere_box` | ✅ `sphere_hull_toi` | 保守（球心到多面体最近点 + 该处法向） |
+| 球 | 凸包 | ✅ `collide_sphere_hull` | ✅ `sphere_hull_toi` | 保守（球心到多面体最近点 + 该处法向） |
+| 球 | 柱 | ✅ `collide_gjk` | ✅ `curved_pair_toi` | 保守（GJK 距离 + 保守推进） |
+| 球 | 胶囊 | ✅ `collide_gjk` | ✅ `curved_pair_toi` | 保守（GJK 距离 + 保守推进） |
+| 球 | 组合体 | ✅ `collide_compound` | ✅ `compound_pair_toi` | 保守（逐部件取最早） |
+| 盒 | 盒 | ✅ `collide_box_box` | ✅ `hull_hull_toi` | 保守（SAT 候选轴逐条推进） |
+| 盒 | 凸包 | ✅ `collide_polytopes` | ✅ `hull_hull_toi` | 保守（SAT 候选轴逐条推进） |
+| 盒 | 柱 | ✅ `collide_gjk` | ✅ `curved_pair_toi` | 保守（GJK 距离 + 保守推进） |
+| 盒 | 胶囊 | ✅ `collide_gjk` | ✅ `curved_pair_toi` | 保守（GJK 距离 + 保守推进） |
+| 盒 | 组合体 | ✅ `collide_compound` | ✅ `compound_pair_toi` | 保守（逐部件取最早） |
+| 凸包 | 凸包 | ✅ `collide_polytopes` | ✅ `hull_hull_toi` | 保守（SAT 候选轴逐条推进） |
+| 凸包 | 柱 | ✅ `collide_gjk` | ✅ `curved_pair_toi` | 保守（GJK 距离 + 保守推进） |
+| 凸包 | 胶囊 | ✅ `collide_gjk` | ✅ `curved_pair_toi` | 保守（GJK 距离 + 保守推进） |
+| 凸包 | 组合体 | ✅ `collide_compound` | ✅ `compound_pair_toi` | 保守（逐部件取最早） |
+| 柱 | 柱 | ✅ `collide_gjk` | ✅ `curved_pair_toi` | 保守（GJK 距离 + 保守推进） |
+| 柱 | 胶囊 | ✅ `collide_gjk` | ✅ `curved_pair_toi` | 保守（GJK 距离 + 保守推进） |
+| 柱 | 组合体 | ✅ `collide_compound` | ✅ `compound_pair_toi` | 保守（逐部件取最早） |
+| 胶囊 | 胶囊 | ✅ `collide_gjk` | ✅ `curved_pair_toi` | 保守（GJK 距离 + 保守推进） |
+| 胶囊 | 组合体 | ✅ `collide_compound` | ✅ `compound_pair_toi` | 保守（逐部件取最早） |
+| 组合体 | 组合体 | ✅ `collide_compound` | ✅ `compound_pair_toi` | 保守（逐部件取最早） |
+
+| 几何 | 窄相 | TOI | TOI 性质 |
+|---|---|---|---|
+| 球 - 地面 | ✅ `collide_sphere_ground` | ✅ `sphere_ground_toi` | 精确（一元一次方程） |
+| 盒 - 地面 | ✅ `collide_box_ground` | ✅ `hull_ground_toi` | 精确（顶点解，含自转） |
+| 凸包 - 地面 | ✅ `collide_hull_ground` | ✅ `hull_ground_toi` | 精确（顶点解，含自转） |
+| 柱 - 地面 | ✅ `collide_cylinder_ground` | ✅ `curved_ground_toi` | 保守（端面圆周最低点 + 自转上界） |
+| 胶囊 - 地面 | ✅ `collide_capsule_ground` | ✅ `curved_ground_toi` | 保守（端球最低点 + 自转上界） |
+| 组合体 - 地面 | ✅ `collide_compound_ground` | ✅ `compound_ground_toi` | 保守（逐部件取最早） |
+<!-- capabilities:end -->
+
+"精确"= 在匀速直线 / 定轴旋转假设下与解析解一致（可能带固定余量，见下面第 1 条）；
+"保守"= 可能偏早、绝不偏晚——偏早只多切一刀，偏晚才会漏切分。
+
+柱与胶囊的侧面/端帽是**曲面**，没有有限 SAT 轴集合可用，因此它们（以及将来
+新增的几何）统一走 **支撑映射 + GJK/EPA**：宽阶段照旧，窄相用 GJK 求分离距离、
+EPA 求穿透，TOI 用"GJK 距离 + 保守推进"。要新增一种几何，只需要在
+`src/physics/support.py` 里写它的 `support(direction)`（几行），**不必碰任何
+碰撞代码**。
+
+三条实现约定（改场景时会影响你读到的数字）：
+
+1. **多面体提前 200 µm**。两盒恰好相切时裁剪多边形退化成单点，单点流形只解掉
+   约 1/3 的法向速度（实测 -7.22 → -4.95 m/s），所以 `_CONTACT_OVERLAP` 故意多
+   推进 200 µm 把流形撑开。副作用：TOI 返回的时刻不是接触时刻
+   （解析 `0.375000` → 读到 `0.375100`），**不要按解析解逐位比对**。
+   球没有裁剪退化问题，不吃这个余量。
+2. **`max_events_per_substep`（默认 8）是硬上限**。达到上限后剩余时间一次性推进，
+   退化为"一次检测 + 一次联立求解"。密集场景里事件数会撞上限，这是有意的兜底。
+3. **`earliest_toi` 是 O(N²)，没有接宽阶段**。宽阶段只加速窄相。物体一多，
+   TOI 反过来成为瓶颈——这是 `docs/08` §10 列出的遗留项。
+4. **保守路径可能报得很早**。`hull_hull_toi` 取"所有候选轴里最早收完的那条"，
+   而接触要求**所有**轴都收完，所以它是下界而不是估计值。实测盒-四面体：
+   真实首次接触约 0.65 s，报出来的是 0.145 s（一条侧向轴的间隙先收完）。
+   代价是子步被多切几刀，不影响力与穿透；但如果事件数撞上
+   `max_events_per_substep`，就会退化成"一次联立求解"。
+
+效果（`tests/test_toi_split.py`、`tests/test_toi_convex.py`）：
 
 | 场景 | 不分段 | 分段 |
 |---|---:|---:|
-| 单子步内链式碰撞的终态 | 错误 | `[0, 0, 60]` 正确 |
-| 最大穿透深度 | 150 mm | **0.000 mm** |
+| 单子步内链式碰撞的终态（球） | 错误 | `[0, 0, 60]` 正确 |
+| 球的链式穿透深度 | 150 mm | **0.000 mm** |
+| 棱柱落地穿透 | 10.533 mm | **0.148 mm** |
+| 盒砸盒穿透 | 5.439 mm | **0.856 mm** |
 | `sim_spheres` 480 步耗时 | 0.230 s | 0.266 s（+16%） |
 
 静置物体不会触发事件（实测平均 0.000 次/步），所以没有持续的额外开销。
+代价是轴枚举：凸包-凸包的 TOI 是每对物体 $O(K^2)$，盒砸盒场景 +35%、单体盒落地
++463%（绝对值只有 0.8 ms/步，属于固定开销主导）。
+
+**稠密堆叠是诚实的边界**：8 层棱柱整体自由落体时，峰值穿透在 10–30 mm 之间跳动，
+开关 TOI 都可能变好或变差。那种场景的瓶颈是"没有暖启动"（一帧内速度被改了 8 次），
+继续加密 TOI 不解决问题。所以 TOI 主要服务于**高速撞击与翻倒落地**，堆叠稳定性
+要靠暖启动 + 子步（`docs/10` §6、`docs/05`）。
 
 ---
 

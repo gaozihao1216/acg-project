@@ -32,6 +32,7 @@ from mathutils import Vector
 from src.geom.geometry import (
     BoxGeometry,
     CapsuleGeometry,
+    CompoundGeometry,
     ConvexHullGeometry,
     CylinderGeometry,
     GeometrySpec,
@@ -258,6 +259,33 @@ def _create_hull(geom: ConvexHullGeometry) -> bpy.types.Object:
     return obj
 
 
+def _create_compound(geom: CompoundGeometry) -> bpy.types.Object:
+    """组合体：逐部件建网格 → 按部件位姿摆好 → join 成一个物体。
+
+    必须用 ``geom.parts`` 而不是场景里的原始部件位姿：构造复合几何时，
+    整体已经被平移到质心、旋转到惯量主轴系，部件的局部位姿也一并换了坐标系。
+    用原始位姿渲染，形状会和碰撞形状整体错开（同一个坑见 ``_create_hull``）。
+    """
+    pieces: list[bpy.types.Object] = []
+    for part in geom.parts:
+        child = _create_mesh(part.geometry)
+        child.rotation_mode = "QUATERNION"
+        child.rotation_quaternion = part.orientation
+        child.location = part.position
+        pieces.append(child)
+
+    bpy.ops.object.select_all(action="DESELECT")
+    for piece in pieces:
+        piece.select_set(True)
+    bpy.context.view_layer.objects.active = pieces[0]
+    if len(pieces) > 1:
+        bpy.ops.object.join()
+
+    obj = bpy.context.active_object
+    _shade_smooth(obj)
+    return obj
+
+
 def _create_mesh(geom: GeometrySpec) -> bpy.types.Object:
     """按几何类型分派到对应的创建函数。
 
@@ -275,6 +303,8 @@ def _create_mesh(geom: GeometrySpec) -> bpy.types.Object:
         return _create_capsule(geom)
     if isinstance(geom, ConvexHullGeometry):
         return _create_hull(geom)
+    if isinstance(geom, CompoundGeometry):
+        return _create_compound(geom)
     raise TypeError(f"几何类型 {type(geom).__name__} 尚未实现 Blender 渲染")
 
 
