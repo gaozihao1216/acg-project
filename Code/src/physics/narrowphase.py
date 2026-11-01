@@ -3,17 +3,27 @@
 
 当前实现范围
 ------------
-============  ==========  ==============================
-物体对        接触点数    法向来源
-============  ==========  ==============================
-球 - 球       1           质心连线
-球 - 地面     1           平面法向
-球 - 盒       1           盒面最近点到球心的方向
-盒 - 地面     ≤4          平面法向（每个陷入地面的顶点一个点）
-============  ==========  ==============================
+================  ==========  ==================================
+物体对            接触点数    实现
+================  ==========  ==================================
+球 - 球           1           解析（质心连线）
+球 - 盒           1           解析（盒面最近点）
+球 - 地面         1           解析（平面法向）
+盒 - 盒           ≤4          SAT + 流形裁剪
+盒/凸包 - 凸包    ≤4          广义 SAT
+球 - 凸包         1           点到多面体最近点
+盒/凸包 - 地面    ≤4          顶点解（每个陷入地面的顶点一点）
+含柱 / 胶囊       1–4         **GJK + EPA**（支撑映射驱动）
+柱 - 地面         ≤4          端面圆周解析最低点
+胶囊 - 地面       ≤2          两端球解析最低点
+================  ==========  ==================================
 
-盒 - 盒（SAT + 流形裁剪）尚未实现，遇到会立即报错而不是静默跳过——
-"物体放进场景却完全不响应"是最难排查的一类问题。
+柱与胶囊的侧面是曲面：既没有有限 SAT 轴集合，也没有顶点可枚举，于是它们
+（以及将来新增的任何凸体）统一走 ``gjk.collide``。要加一种几何，只需在
+``support.py`` 里写它的支撑函数，不必在这里加分支——
+"按几何对写函数"的组合爆炸到此为止。
+
+任何"有几何但没有窄相"的组合都会在**加载阶段**被拒绝，不会静默穿模。
 
 为什么球和盒的点数不一样
 ------------------------
@@ -43,10 +53,14 @@ from .body import RigidBody
 from .contact import GROUND_BODY, ContactManifold, ContactPoint, merge_pair_materials
 from ..geom.geometry import (
     BoxGeometry,
+    CapsuleGeometry,
+    CompoundGeometry,
     ConvexHullGeometry,
+    CylinderGeometry,
     GeometrySpec,
     SphereGeometry,
 )
+from .body import iter_parts
 from .convex_sat import (
     Polytope,
     closest_point_on_polytope,
@@ -54,6 +68,9 @@ from .convex_sat import (
     polytope_from_box,
     polytope_from_hull,
 )
+from . import capabilities
+from . import gjk as gjk_module
+from . import support as support_module
 from .sat import collide_box_box
 
 #: 盒-地面接触点的数量上限。
@@ -61,6 +78,12 @@ from .sat import collide_box_box
 #: 4 个点已经足够表达任意姿态下的接触面，多出来的点只会增加求解器负担、
 #: 且彼此冗余（法向完全相同），因此按穿透深度取最深的 4 个。
 MAX_BOX_GROUND_POINTS = 4
+
+#: 侧面或端帽是曲面的几何：没有有限 SAT 轴集合，窄相必须走 GJK/EPA。
+_CURVED = (CylinderGeometry, CapsuleGeometry)
+
+#: 复合体-地面的接触点数上限（按深度挑最深的）。见 collide_compound_ground。
+_MAX_COMPOUND_GROUND_POINTS = 16
 
 
 @dataclass
@@ -88,21 +111,29 @@ class GroundPlane:
 def is_supported(geometry: GeometrySpec | None) -> bool:
     """判断单个几何体是否已有窄相实现。
 
-    球、盒、凸包三者任意组合都已实现（凸包走广义 SAT，
-    球-凸包走"点到多面体最近点"）。
+    判据来自 ``capabilities.SUPPORTED_KINDS``，**不在这里另列类型元组**：
+    两处各写一遍，新增几何时总有一处会忘，而忘掉的那一处会静默地"不支持"
+    一个已经能跑的几何。
     """
-    return isinstance(
-        geometry, (SphereGeometry, BoxGeometry, ConvexHullGeometry)
-    )
+    return capabilities.kind_of(geometry) in capabilities.SUPPORTED_KINDS
 
 
 def supported_pair(geometry_a: GeometrySpec | None, geometry_b: GeometrySpec | None) -> bool:
     """判断一对几何体之间是否已有窄相实现。
 
-    单独判断**物体对**而不只是单个物体：球和盒各自都支持，
-    但"盒-盒"还没写。只检查单体会让盒-盒场景静默地不产生任何接触。
+    单独判断**物体对**而不只是单个物体：两种几何各自都支持，不代表它们的组合
+    就一定支持。只查单个体会让"组合未实现"的场景静默地不产生任何接触——
+    物体互相穿过却毫无反应，是最难排查的一类症状。
+
+    判据同样来自能力矩阵（``capabilities.NARROWPHASE_IMPL``），而不是
+    "两次 ``is_supported``"：后者假定"单个支持 ⇒ 组合支持"，这个假定在
+    球与盒并存的第一天就不成立过（曾经盒-盒未实现，但两者各自都支持）。
     """
-    return is_supported(geometry_a) and is_supported(geometry_b)
+    kind_a = capabilities.kind_of(geometry_a)
+    kind_b = capabilities.kind_of(geometry_b)
+    if kind_a is None or kind_b is None:
+        return False
+    return capabilities.has_narrowphase(kind_a, kind_b)
 
 
 # ---------------------------------------------------------------------------
@@ -291,6 +322,16 @@ def collide_box_ground(
     求解器虽然会靠摩擦勉强撑住，但表现为持续抖动与缓慢倾斜。
     4 个点分布在一个面上，法向约束天然阻止了翻转。
 
+    特征 ID 的约定
+    --------------
+    同一物体的地面接触点**共用**默认的 ``feature_id=0``，不按顶点编号区分
+    （凸包、柱、胶囊-地面同此约定）。理由有两条：一是这几个点的法向完全相同，
+    暖启动缓存里一个标量就能表达它们各自的那份支撑冲量，按顶点拆成四个键只是
+    把同一个数抄四遍；二是顶点编号要求顶点顺序在旋转下保持稳定，这个前提一旦
+    不成立，暖启动就会把冲量喂到错误的角上。真正需要区分的是**不同物体/不同
+    部件**——那层区分由 ``collide_compound`` / ``collide_compound_ground`` 的
+    偏移负责，与本函数的每个点无关。
+
     返回
     ----
     list[ContactPoint]
@@ -324,6 +365,160 @@ def collide_box_ground(
         del points[MAX_BOX_GROUND_POINTS:]
 
     return points
+
+
+# ---------------------------------------------------------------------------
+# 柱 / 胶囊 - 地面
+# ---------------------------------------------------------------------------
+
+def collide_cylinder_ground(
+    body: RigidBody, ground: GroundPlane
+) -> list[ContactPoint]:
+    """圆柱与水平地面：解析求出两条端面圆周上的最低点，最多返回 4 个接触点。
+
+    为什么不能像盒那样"顶点下落"
+    ----------------------------
+    圆柱没有顶点——它的最低点落在端面圆周上，而圆周上最低的那个角度是**可解析
+    求出**的：
+
+        ``z(θ) = z_c + s·(h/2)·n_z + r·(cosθ·e1_z + sinθ·e2_z)``
+
+    对 ``θ`` 求极小得 ``θ* = atan2(-e2_z, -e1_z)``（``n`` 是轴、``e1/e2`` 是
+    端面内的两个正交单位向量）。``θ*`` 那一点就是**精确**最低点，深度不带任何
+    采样误差。
+
+    再以 ``θ*`` 为起点每 90° 取一个点，是为了"平放"时的多点流形：立着的圆柱
+    四个点深度相同，能撑住不翻；倾斜时其余三点深度更浅（甚至为负被裁掉），
+    自然退化成 1–2 点接触。深度逐点按投影算，不搞"统一深度"。
+    """
+    geometry = body.geometry
+    radius = geometry.radius
+    half_height = 0.5 * geometry.height
+
+    axis = support_module.world_axis(body)
+    e1, e2 = vec3.orthogonal_basis(axis)
+
+    # 圆周上 z 最低的角度
+    if math.hypot(e1[2], e2[2]) > 1e-12:
+        theta0 = math.atan2(-e2[2], -e1[2])
+    else:
+        theta0 = 0.0   # 圆柱立得笔直：整圈等高，角度任取
+
+    points: list[ContactPoint] = []
+    for cap_sign in (-1.0, 1.0):
+        cap_center = vec3.madd(body.position, axis, cap_sign * half_height)
+        for step in range(4):
+            angle = theta0 + step * 0.5 * math.pi
+            cos_a = math.cos(angle)
+            sin_a = math.sin(angle)
+            world = (
+                cap_center[0] + (e1[0] * cos_a + e2[0] * sin_a) * radius,
+                cap_center[1] + (e1[1] * cos_a + e2[1] * sin_a) * radius,
+                cap_center[2] + (e1[2] * cos_a + e2[2] * sin_a) * radius,
+            )
+            if world[2] >= ground.z:
+                continue
+            points.append(
+                ContactPoint(
+                    position=(world[0], world[1], 0.5 * (world[2] + ground.z)),
+                    normal=(0.0, 0.0, 1.0),
+                    penetration=ground.z - world[2],
+                )
+            )
+
+    if len(points) > MAX_BOX_GROUND_POINTS:
+        points.sort(key=lambda item: item.penetration, reverse=True)
+        del points[MAX_BOX_GROUND_POINTS:]
+    return points
+
+
+def collide_capsule_ground(
+    body: RigidBody, ground: GroundPlane
+) -> list[ContactPoint]:
+    """胶囊与水平地面：两个端球的球底各一个接触点（横放时是 2 点了）。
+
+    胶囊 = 线段 ⊕ 球，最低点必然出现在**线段的某个端点下方 r 处**
+    （线段本身是直线，z 的最小值只在端点取到）。所以这里没有采样误差：
+    端点球的最低点就是胶囊表面的最低点，是精确解。
+    """
+    geometry = body.geometry
+    radius = geometry.radius
+    half_height = 0.5 * geometry.height
+    axis = support_module.world_axis(body)
+
+    points: list[ContactPoint] = []
+    for sign in (-1.0, 1.0):
+        endpoint = vec3.madd(body.position, axis, sign * half_height)
+        lowest_z = endpoint[2] - radius
+        if lowest_z >= ground.z:
+            continue
+        points.append(
+            ContactPoint(
+                position=(endpoint[0], endpoint[1], 0.5 * (lowest_z + ground.z)),
+                normal=(0.0, 0.0, 1.0),
+                penetration=ground.z - lowest_z,
+            )
+        )
+    return points
+
+
+def _part_ground_points(view, ground: GroundPlane) -> list[ContactPoint]:
+    """单个部件与地面的接触点。``view`` 可以是刚体，也可以是复合体的部件视图。"""
+    geometry = view.geometry
+    if isinstance(geometry, BoxGeometry):
+        return collide_box_ground(view, ground)
+    if isinstance(geometry, ConvexHullGeometry):
+        return collide_hull_ground(view, ground)
+    if isinstance(geometry, CylinderGeometry):
+        return collide_cylinder_ground(view, ground)
+    if isinstance(geometry, CapsuleGeometry):
+        return collide_capsule_ground(view, ground)
+    single = collide_sphere_ground(view, ground)
+    return [single] if single is not None else []
+
+
+def collide_compound_ground(
+    body: RigidBody, ground: GroundPlane
+) -> list[ContactPoint]:
+    """复合体与地面：逐部件求交，特征 ID 按部件加偏移。
+
+    点数上限
+    --------
+    部件一多，地面接触点会线性增长，而求解器是"迭代次数 × 接触点数"。
+    这里按深度保留最深的 ``_MAX_COMPOUND_GROUND_POINTS`` 个：真正撑住物体的
+    就是这些点，浅的那几个对姿态几乎没有贡献。排序键用
+    ``(-深度, 特征 ID)``，保证结果逐帧确定，不会因为字典顺序抖动。
+    """
+    points: list[ContactPoint] = []
+    for part_index, view in iter_parts(body):
+        offset = part_index * _PART_FEATURE_STRIDE
+        for point in _part_ground_points(view, ground):
+            points.append(
+                ContactPoint(
+                    position=point.position,
+                    normal=point.normal,
+                    penetration=point.penetration,
+                    feature_id=offset + point.feature_id,
+                )
+            )
+
+    if len(points) > _MAX_COMPOUND_GROUND_POINTS:
+        points.sort(key=lambda item: (-item.penetration, item.feature_id))
+        del points[_MAX_COMPOUND_GROUND_POINTS:]
+    return points
+
+
+# ---------------------------------------------------------------------------
+# 通用凸体（GJK/EPA）
+# ---------------------------------------------------------------------------
+
+def collide_gjk(body_a: RigidBody, body_b: RigidBody) -> list[ContactPoint]:
+    """任意凸体对的通用窄相：GJK 求分离距离、EPA 求穿透，返回 1–4 点流形。
+
+    覆盖柱、胶囊参与的 9 种组合，以及将来新增的所有几何体。球-球、盒-盒等
+    已有解析解的组合**不走这里**——它们的闭式解更精确也更快。
+    """
+    return gjk_module.collide(body_a, body_b)
 
 
 # ---------------------------------------------------------------------------
@@ -401,7 +596,7 @@ def collide_hull_ground(
     geometry = body.geometry
     points: list[ContactPoint] = []
 
-    for index, local in enumerate(geometry.vertices):
+    for local in geometry.vertices:
         world = _local_to_world(body, local)
         if world[2] >= ground.z:
             continue
@@ -410,8 +605,6 @@ def collide_hull_ground(
                 position=(world[0], world[1], 0.5 * (world[2] + ground.z)),
                 normal=(0.0, 0.0, 1.0),
                 penetration=ground.z - world[2],
-                # 顶点下标是稳定的几何特征，可直接做暖启动的匹配键
-                feature_id=1000 + index,
             )
         )
 
@@ -422,13 +615,11 @@ def collide_hull_ground(
     return points
 
 
-def _collide_pair(
-    index_a: int,
-    body_a: RigidBody,
-    index_b: int,
-    body_b: RigidBody,
-) -> ContactManifold | None:
-    """按几何类型分派到对应的窄相函数，返回带材质参数的流形。
+def _collide_points(body_a, body_b) -> list[ContactPoint]:
+    """按几何类型分派到具体窄相函数，返回接触点（不含材质、不含流形）。
+
+    参数是"像刚体的东西"：真实 ``RigidBody``，或复合体展开出的 ``PartView``。
+    因此这里只允许读 ``geometry`` / ``position`` / ``orientation``。
 
     法向一律调整为"从 a 指向 b"，因此分派时可能需要取反
     （``collide_sphere_box`` 天然返回"盒指向球"）。
@@ -443,8 +634,12 @@ def _collide_pair(
 
     points: list[ContactPoint] = []
 
+    # 侧面是曲面的几何（柱/胶囊）没有有限 SAT 轴集合，一律走 GJK/EPA。
+    # 放在最前面：曲面体既不是盒也不是凸包，任何后续分支都不适用。
+    if isinstance(geometry_a, _CURVED) or isinstance(geometry_b, _CURVED):
+        points = collide_gjk(body_a, body_b)
     # 凸包参与的组合优先处理：一律走广义 SAT，法向天然是 a→b
-    if a_is_hull or b_is_hull:
+    elif a_is_hull or b_is_hull:
         if a_is_hull and b_is_hull:
             points = collide_polytopes(
                 polytope_from_hull(geometry_a, body_a.position, body_a.orientation),
@@ -500,6 +695,68 @@ def _collide_pair(
                     penetration=point.penetration,
                 )
             ]
+
+    return points
+
+
+#: 复合体特征 ID 的命名空间步长。各部件的 ID 都小于它（凸包最大约 3e5），
+#: 于是 ``部件对编号 × 步长 + 局部 ID`` 在所有部件对之间都不会撞号。
+_PART_FEATURE_STRIDE = 1_000_000
+
+
+def collide_compound(index_a, body_a, index_b, body_b) -> list[ContactPoint]:
+    """复合体参与的一对刚体：逐部件求交，把接触点并到一起。
+
+    为什么要给特征 ID 加偏移
+    ----------------------
+    暖启动的键是 ``(body_a, body_b, feature_id)``。复合体的两个不同部件
+    完全可能产生相同的局部 ID（比如两个盒子部件都给出 feature_id=1），
+    不动偏移就会把冲量喂到另一个部件的接触点上——症状是静置的物体莫名抖动。
+
+    为什么结果仍然只有一个流形
+    ------------------------
+    求解器按流形遍历，同一对刚体的接触点是否拆成两个流形在数学上等价；
+    合成一个可以少一次材质合成，也避免"同一对物体出现两条记录"这种容易
+    写错下游代码的形态。点数不限，求解器本来就是逐点迭代。
+    """
+    parts_a = iter_parts(body_a)
+    parts_b = iter_parts(body_b)
+
+    points: list[ContactPoint] = []
+    for part_index_a, view_a in parts_a:
+        for part_index_b, view_b in parts_b:
+            local_points = _collide_points(view_a, view_b)
+            if not local_points:
+                continue
+            offset = (part_index_a * len(parts_b) + part_index_b) * _PART_FEATURE_STRIDE
+            for point in local_points:
+                points.append(
+                    ContactPoint(
+                        position=point.position,
+                        normal=point.normal,
+                        penetration=point.penetration,
+                        feature_id=offset + point.feature_id,
+                    )
+                )
+    return points
+
+
+def _collide_pair(
+    index_a: int,
+    body_a: RigidBody,
+    index_b: int,
+    body_b: RigidBody,
+) -> ContactManifold | None:
+    """检测一对刚体，返回带材质参数的流形；无接触返回 ``None``。
+
+    复合体在这里展开成部件对，其余几何按类型分派（见 ``_collide_points``）。
+    """
+    if isinstance(body_a.geometry, CompoundGeometry) or isinstance(
+        body_b.geometry, CompoundGeometry
+    ):
+        points = collide_compound(index_a, body_a, index_b, body_b)
+    else:
+        points = _collide_points(body_a, body_b)
 
     if not points:
         return None
@@ -567,13 +824,10 @@ def detect_contacts(
 
         # --- 与地面 ---
         if ground is not None and not body_i.is_static:
-            if isinstance(body_i.geometry, BoxGeometry):
-                ground_points = collide_box_ground(body_i, ground)
-            elif isinstance(body_i.geometry, ConvexHullGeometry):
-                ground_points = collide_hull_ground(body_i, ground)
+            if isinstance(body_i.geometry, CompoundGeometry):
+                ground_points = collide_compound_ground(body_i, ground)
             else:
-                single = collide_sphere_ground(body_i, ground)
-                ground_points = [single] if single is not None else []
+                ground_points = _part_ground_points(body_i, ground)
 
             if ground_points:
                 manifolds.append(

@@ -29,7 +29,7 @@
 
 from __future__ import annotations
 
-from ..geom.geometry import GeometrySpec
+from ..geom.geometry import CompoundGeometry, GeometrySpec
 from ..geom.inertia import compute_inertia
 from ..mathutils import quaternion as quat
 from ..mathutils import vec3
@@ -268,6 +268,56 @@ class RigidBody:
             f"RigidBody({self.name!r}, {flag}, "
             f"pos=({self.position[0]:.3f}, {self.position[1]:.3f}, {self.position[2]:.3f}))"
         )
+
+
+class PartView:
+    """复合几何里某一个部件在世界坐标下的位姿。
+
+    碰撞/TOI 函数只读 ``geometry``、``position``、``orientation``（TOI 还要
+    两个速度），所以一个部件可以直接伪装成"一个刚体"喂给现有分派逻辑，
+    不必给每种几何再写一遍复合体版本。
+
+    速度为什么要算 ``v + ω × r``
+    ----------------------------
+    部件的质心不在刚体质心上。刚体转动时部件在平移，TOI 若用整体质心速度，
+    一个旋转中的哑铃会算不出任何接近——高速旋转的物体就会穿模。
+    """
+
+    __slots__ = (
+        "geometry",
+        "position",
+        "orientation",
+        "linear_velocity",
+        "angular_velocity",
+        "friction",
+        "restitution",
+        "is_static",
+    )
+
+    def __init__(self, body: "RigidBody", part) -> None:
+        offset = quat.quat_rotate_vector(body.orientation, part.position)
+        self.geometry = part.geometry
+        self.position = vec3.add(body.position, offset)
+        self.orientation = quat.quat_multiply(body.orientation, part.orientation)
+        self.linear_velocity = vec3.add(
+            body.linear_velocity, vec3.cross(body.angular_velocity, offset)
+        )
+        self.angular_velocity = body.angular_velocity
+        self.friction = body.friction
+        self.restitution = body.restitution
+        self.is_static = body.is_static
+
+
+def iter_parts(body) -> list:
+    """列出参与碰撞的部件：``[(部件编号, 部件视图), ...]``。
+
+    普通刚体就是"编号 0 的自己"——这样上层代码不需要为复合体写两条路径。
+    对 ``RigidBody`` 直接返回它自身，零分配。
+    """
+    geometry = getattr(body, "geometry", None)
+    if isinstance(geometry, CompoundGeometry):
+        return [(index, PartView(body, part)) for index, part in enumerate(geometry.parts)]
+    return [(0, body)]
 
 
 def make_ground_proxy(name: str = "__ground__") -> RigidBody:

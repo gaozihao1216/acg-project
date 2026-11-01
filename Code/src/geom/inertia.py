@@ -20,6 +20,7 @@ from __future__ import annotations
 from .geometry import (
     BoxGeometry,
     CapsuleGeometry,
+    CompoundGeometry,
     ConvexHullGeometry,
     CylinderGeometry,
     GeometrySpec,
@@ -143,6 +144,10 @@ def compute_inertia(geometry: GeometrySpec, mass: float) -> tuple[float, float, 
         return cylinder_inertia(mass, geometry.radius, geometry.height)
     if isinstance(geometry, CapsuleGeometry):
         return capsule_inertia(mass, geometry.radius, geometry.height)
+    if isinstance(geometry, CompoundGeometry):
+        # 复合体的张量由部件合成（含平行轴定理），一般含惯量积；
+        # 这里返回的同样是**主惯量**，必须与 ``inertia_frame()`` 成对使用。
+        return geometry.principal_moments(mass)
     if isinstance(geometry, ConvexHullGeometry):
         # 凸包的张量一般不是对角的，这里返回的是**主惯量**——
         # 它只有在物体姿态里并入了 ``inertia_frame()`` 之后才是正确的对角表示。

@@ -412,6 +412,259 @@ class ConvexHullGeometry(GeometrySpec):
 
 
 # ---------------------------------------------------------------------------
+# 组合体（解析路线的"拼装建模"）
+# ---------------------------------------------------------------------------
+
+class CompoundPart:
+    """复合几何中的一个部件：几何 + 相对复合体质心的位姿。"""
+
+    __slots__ = ("geometry", "position", "orientation")
+
+    def __init__(
+        self,
+        geometry: GeometrySpec,
+        position: Sequence[float] = (0.0, 0.0, 0.0),
+        orientation: Sequence[float] = (1.0, 0.0, 0.0, 0.0),
+    ) -> None:
+        if not isinstance(geometry, GeometrySpec):
+            raise TypeError(
+                f"部件几何必须是 GeometrySpec，收到：{type(geometry).__name__}"
+            )
+        self.geometry = geometry
+        self.position = (
+            float(position[0]),
+            float(position[1]),
+            float(position[2]),
+        )
+        self.orientation = quat.quat_normalize(
+            (
+                float(orientation[0]),
+                float(orientation[1]),
+                float(orientation[2]),
+                float(orientation[3]),
+            )
+        )
+
+    def to_dict(self) -> dict:
+        """导出为可写回 JSON 的字典。"""
+        return {
+            "geometry": self.geometry.to_dict(),
+            "position": list(self.position),
+            "orientation": list(self.orientation),
+        }
+
+    def __repr__(self) -> str:  # pragma: no cover - 调试用
+        return (
+            f"CompoundPart({self.geometry.type_name} @ "
+            f"{tuple(round(v, 4) for v in self.position)})"
+        )
+
+
+class CompoundGeometry(GeometrySpec):
+    """由若干基本几何体拼成的刚体 —— "解析组合建模"的入口。
+
+    为什么不是凸包
+    -------------
+    凸包只能表示**凸**的**多面体**。L 形支架、人形、带凹槽的夹具都不凸：
+    取凸包会把凹槽填平，碰撞体积凭空变大，物体悬在半空；离散成网格又丢掉
+    解析精度、且没有闭式惯量。复合体保留每个部件的原始解析形状，碰撞时逐
+    部件求交、结果取并集，体积/惯量/包围球全部精确。
+
+    质量属性怎么算
+    --------------
+    按**单位密度**处理：部件质量正比于自身体积，于是
+
+    - 质心 ``c = Σ V_i p_i / Σ V_i``
+    - 张量 ``I = Σ [ V_i·R_i Λ_i R_iᵀ + V_i(|d_i|²E - d_i d_iᵀ) ]``，
+      ``d_i = p_i - c``，后一项是**平行轴定理**
+
+    得到的是完整 3×3 张量（一般含惯量积），随后做主轴分解，把主轴旋转
+    ``Q = inertia_frame()`` 并进姿态——和凸包完全同一套机制，求解器不用改。
+    部件的位姿也一并平移到质心、旋到主轴系，于是碰撞代码拿到的就是最终坐标。
+
+    质量分布的可调性
+    ----------------
+    现在只按体积分配。想做"底座是钢、头是木头"，需要给部件单独的密度，
+    那是下一步（场景里加 ``density``），不影响这里的接口。
+    """
+
+    type_name = "compound"
+
+    __slots__ = (
+        "parts",
+        "com_offset",
+        "_volume",
+        "_radius",
+        "_unit_moments",
+        "_frame",
+    )
+
+    def __init__(self, parts: Sequence[CompoundPart]) -> None:
+        if not parts:
+            raise ValueError("复合几何至少需要一个部件")
+        for part in parts:
+            if not isinstance(part, CompoundPart):
+                raise TypeError(
+                    f"复合几何的部件必须是 CompoundPart，收到：{type(part).__name__}"
+                )
+
+        # 延迟导入：inertia 反向依赖本模块，模块级导入会成环
+        from .inertia import compute_inertia
+
+        volumes = [float(part.geometry.volume()) for part in parts]
+        total_volume = sum(volumes)
+        if total_volume <= 0.0:
+            raise ValueError(f"复合几何的总体积必须为正，收到：{total_volume}")
+
+        # --- 1. 质心（按体积加权）---
+        center = [0.0, 0.0, 0.0]
+        for part, volume in zip(parts, volumes):
+            for axis in range(3):
+                center[axis] += part.position[axis] * volume
+        center = (
+            center[0] / total_volume,
+            center[1] / total_volume,
+            center[2] / total_volume,
+        )
+
+        # --- 2. 单位密度下的完整张量 ---
+        tensor = [[0.0, 0.0, 0.0] for _ in range(3)]
+        for part, volume in zip(parts, volumes):
+            # 部件本身的主惯量（单位质量）与它的主轴
+            moments = compute_inertia(part.geometry, 1.0)
+            rotation = quat.quat_multiply(part.orientation, part.geometry.inertia_frame())
+            axes = [
+                quat.quat_rotate_vector(rotation, unit)
+                for unit in ((1.0, 0.0, 0.0), (0.0, 1.0, 0.0), (0.0, 0.0, 1.0))
+            ]
+            # I = Σ λ_k u_k u_kᵀ ：用主轴外积展开旋转后的张量
+            for index in range(3):
+                weight = volume * moments[index]
+                for row in range(3):
+                    for column in range(3):
+                        tensor[row][column] += weight * axes[index][row] * axes[index][column]
+
+            # 平行轴定理
+            offset = (
+                part.position[0] - center[0],
+                part.position[1] - center[1],
+                part.position[2] - center[2],
+            )
+            squared = _dot3(offset, offset)
+            for row in range(3):
+                for column in range(3):
+                    delta = squared if row == column else 0.0
+                    tensor[row][column] += volume * (
+                        delta - offset[row] * offset[column]
+                    )
+
+        # --- 3. 主轴分解 ---
+        from .massprops import MassProperties
+
+        properties = MassProperties(
+            mass=total_volume,
+            center_of_mass=(0.0, 0.0, 0.0),
+            inertia=(tuple(tensor[0]), tuple(tensor[1]), tuple(tensor[2])),
+            volume=total_volume,
+            source="compound",
+        )
+        if properties.is_diagonal():
+            # 张量本来就是对角阵：直接用原坐标轴的顺序，别为了"凑升序"去rotate。
+            # 否则单部件的复合体会长出一个 90° 的主轴旋转——物理等价，但姿态
+            # 无端被置换，渲染和"和原图元逐位一致"的对照都会被打乱。
+            moments = properties.diagonal
+            self._frame = (1.0, 0.0, 0.0, 0.0)
+        else:
+            moments, axes_matrix = properties.principal()
+            self._frame = matrix3_to_quaternion(axes_matrix)
+
+        self._unit_moments = tuple(moment / total_volume for moment in moments)
+        self._volume = total_volume
+        self.com_offset = center
+
+        # --- 4. 部件位姿搬进"质心 + 主轴"坐标系 ---
+        to_principal = quat.quat_conjugate(self._frame)
+        local_parts = []
+        radius = 0.0
+        for part in parts:
+            shifted = (
+                part.position[0] - center[0],
+                part.position[1] - center[1],
+                part.position[2] - center[2],
+            )
+            position = quat.quat_rotate_vector(to_principal, shifted)
+            orientation = quat.quat_multiply(to_principal, part.orientation)
+            local_parts.append(CompoundPart(part.geometry, position, orientation))
+            radius = max(
+                radius,
+                math.sqrt(_dot3(position, position)) + part.geometry.bounding_radius(),
+            )
+        self.parts = local_parts
+        self._radius = radius
+
+    # -- 几何量 -----------------------------------------------------------
+
+    def volume(self) -> float:
+        """总体积（各部件之和，重叠部分不扣减）。"""
+        return self._volume
+
+    def bounding_radius(self) -> float:
+        """以质心为球心、包住所有部件的包围球半径。"""
+        return self._radius
+
+    def principal_moments(self, mass: float) -> tuple[float, float, float]:
+        """给定质量下的主惯量（对角）。"""
+        if mass <= 0.0:
+            raise ValueError(f"质量必须为正数，收到：{mass}")
+        return tuple(mass * value for value in self._unit_moments)
+
+    def inertia_frame(self) -> tuple[float, float, float, float]:
+        """几何坐标系 → 惯量主轴系的旋转四元数（复合体一般不是单位旋转）。"""
+        return self._frame
+
+    def to_dict(self) -> dict:
+        """导出为可写回 JSON 的字典（部件相对**原始**质心给出）。"""
+        parts = []
+        for part in self.parts:
+            parts.append(
+                {
+                    "geometry": part.geometry.to_dict(),
+                    "position": list(part.position),
+                    "orientation": list(part.orientation),
+                }
+            )
+        return {"type": "compound", "parts": parts}
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "CompoundGeometry":
+        """从场景 JSON 的 ``{"type": "compound", "parts": [...]}`` 构造。"""
+        raw_parts = data.get("parts")
+        if not raw_parts:
+            raise ValueError("compound 至少需要一个 parts 条目")
+
+        parts = []
+        for index, item in enumerate(raw_parts):
+            if not isinstance(item, dict):
+                raise ValueError(f"compound.parts[{index}] 必须是对象")
+            geometry_data = item.get("geometry")
+            if not isinstance(geometry_data, dict):
+                raise ValueError(f"compound.parts[{index}] 缺少 geometry")
+            if "orientation_euler_deg" in item:
+                rx, ry, rz = item["orientation_euler_deg"]
+                orientation = quat.quat_from_euler_degrees(rx, ry, rz)
+            else:
+                orientation = item.get("orientation", (1.0, 0.0, 0.0, 0.0))
+            parts.append(
+                CompoundPart(
+                    GeometrySpec.from_dict(geometry_data),
+                    item.get("position", (0.0, 0.0, 0.0)),
+                    orientation,
+                )
+            )
+        return cls(parts)
+
+
+# ---------------------------------------------------------------------------
 # 类型注册表与解析辅助
 # ---------------------------------------------------------------------------
 
@@ -428,6 +681,8 @@ _GEOMETRY_REGISTRY = {
     "hull": lambda d: ConvexHullGeometry(
         d["points"], d.get("max_faces", 64)
     ),
+    # 组合体：若干基本几何体 + 各自的局部位姿
+    "compound": lambda d: CompoundGeometry.from_dict(d),
 }
 
 
