@@ -50,9 +50,14 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 
-from ..geom.geometry import BoxGeometry, ConvexHullGeometry, SphereGeometry
+from ..geom.geometry import (
+    BoxGeometry,
+    CompoundGeometry,
+    ConvexHullGeometry,
+    SphereGeometry,
+)
 from ..mathutils import quaternion as quat
-from .body import RigidBody
+from .body import RigidBody, iter_parts
 
 #: 自动估算格子边长时，相对"平均包围球半径"的倍数。
 #:
@@ -108,6 +113,21 @@ def world_aabb(body: RigidBody) -> AABB:
     """
     geometry = body.geometry
     center = body.position
+
+    if isinstance(geometry, CompoundGeometry):
+        # 复合体：逐部件算 AABB 再取并集。部件的世界位姿由 PartView 给出，
+        # 与窄相看到的位姿完全同源，不会出现"宽相按整体、窄相按部件"的错位。
+        lower = [float("inf"), float("inf"), float("inf")]
+        upper = [float("-inf"), float("-inf"), float("-inf")]
+        for _index, view in iter_parts(body):
+            box = world_aabb(view)
+            for axis in range(3):
+                lower[axis] = min(lower[axis], box.lower[axis])
+                upper[axis] = max(upper[axis], box.upper[axis])
+        return AABB(
+            (lower[0], lower[1], lower[2]),
+            (upper[0], upper[1], upper[2]),
+        )
 
     if isinstance(geometry, SphereGeometry):
         radius = geometry.radius
@@ -276,13 +296,24 @@ class SpatialHashBroadphase:
 
     # -- 主流程 -----------------------------------------------------------
 
-    def candidate_pairs(self, bodies: list[RigidBody]) -> list[tuple[int, int]]:
+    def candidate_pairs(
+        self,
+        bodies: list[RigidBody],
+        inflation: list[float] | None = None,
+    ) -> list[tuple[int, int]]:
         """返回可能相交的物体对 ``(i, j)``，``i < j``，按字典序排序。
 
         排序是刻意的：哈希表的遍历顺序依赖插入顺序，不同配置下可能不同。
         若不加排序，求解器的接触处理顺序会随物体数量浮动，
         导致同一场景在不同规模下给出略有差异的结果——
         这对"可复现"和"与基线对比"都是致命的。
+
+        参数
+        ----
+        inflation : 可选，逐物体的 AABB 膨胀半径（米）。给 TOI 用：它要回答的是
+            "这个子步内有没有可能碰上"，所以 AABB 必须按**本子步最大位移**膨胀
+            （``|v|h + |ω|Rh``），否则高速物体在穿过的过程中根本没有重叠的 AABB，
+            宽阶段会把真正要切的碰撞漏掉。默认 ``None`` 表示不膨胀，用于窄相。
         """
         count = len(bodies)
         if count < 2:
@@ -290,6 +321,14 @@ class SpatialHashBroadphase:
             return []
 
         boxes = [world_aabb(body) for body in bodies]
+        if inflation is not None:
+            boxes = [
+                AABB(
+                    (box.lower[0] - extra, box.lower[1] - extra, box.lower[2] - extra),
+                    (box.upper[0] + extra, box.upper[1] + extra, box.upper[2] + extra),
+                ) if extra > 0.0 else box
+                for box, extra in zip(boxes, inflation)
+            ]
         if self.margin > 0.0:
             boxes = [
                 AABB(

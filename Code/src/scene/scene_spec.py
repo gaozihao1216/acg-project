@@ -453,6 +453,7 @@ class SimulationSpec:
         "ground_restitution", "linear_damping", "angular_damping",
         "allow_initial_overlap", "overlap_tolerance",
         "use_toi_splitting", "max_events_per_substep",
+        "warm_start",
         "broadphase", "broadphase_cell_size",
         "render_fps", "duration",
     )
@@ -480,6 +481,9 @@ class SimulationSpec:
         overlap_tolerance: float = 1e-3,
         use_toi_splitting: bool = True,
         max_events_per_substep: int = 8,
+        # 跨帧复用累积冲量。默认开启：静置接触的冲量每帧几乎不变，暖启动让
+        # 迭代只需修正变化量，同迭代数下堆叠更硬。关掉用于 A/B 对照实验。
+        warm_start: bool = True,
         broadphase: str = "spatial_hash",
         broadphase_cell_size: float = 0.0,
         render_fps: int = 24,
@@ -575,6 +579,11 @@ class SimulationSpec:
             )
         self.max_events_per_substep = max_events
 
+        # --- 暖启动 ---
+        # 缓存键是 (body_a, body_b, feature_id)：body 索引在同一个 world 内稳定，
+        # feature_id 由流形裁剪按几何特征给出，所以跨帧能认出"同一个接触点"。
+        self.warm_start = bool(warm_start)
+
         # --- 宽阶段（broadphase） ---
         # "spatial_hash" 用均匀网格剔除明显不相交的物体对；
         # "brute" 保留 O(N²) 暴力枚举，用于**加速比对照**。
@@ -606,31 +615,56 @@ class SimulationSpec:
 
     @classmethod
     def from_dict(cls, data: dict | None) -> "SimulationSpec":
-        """从 JSON 的 ``simulation`` 段构造；缺省时返回"未启用"的默认值。"""
+        """从 JSON 的 ``simulation`` 段构造；缺省时返回"未启用"的默认值。
+
+        所有缺省值都**从 ``cls()`` 取**，不在本函数里另抄一遍。这里曾经把
+        ``substeps``/``iterations`` 硬编码为 2/12，而构造函数早就按
+        ``scripts/bench_solver_strategy.py`` 的实测改成 3/8（见 ``docs/05``）。
+        于是"程序内默认"和"JSON 默认"静默分叉：手写场景只要不显式写这两个
+        字段，走的就是已被否决的旧参数，而代码里看不出任何异常。
+        单一定义处消除这类漂移。
+        """
         if not data:
             return cls()
+
+        defaults = cls()
         return cls(
             enabled=data.get("enabled", True),
-            physics_dt=data.get("physics_dt", 1.0 / 240.0),
-            substeps=data.get("substeps", 2),
-            iterations=data.get("iterations", 12),
-            baumgarte=data.get("baumgarte", 0.25),
-            slop=data.get("slop", 0.002),
-            restitution_threshold=data.get("restitution_threshold", 1.0),
-            gravity=data.get("gravity", (0.0, 0.0, -9.81)),
-            ground_z=data.get("ground_z", 0.0),
-            ground_friction=data.get("ground_friction", 0.55),
-            ground_restitution=data.get("ground_restitution", 0.12),
-            linear_damping=data.get("linear_damping", 0.05),
-            angular_damping=data.get("angular_damping", 1.0),
-            allow_initial_overlap=data.get("allow_initial_overlap", False),
-            overlap_tolerance=data.get("overlap_tolerance", 1e-3),
-            use_toi_splitting=data.get("use_toi_splitting", True),
-            max_events_per_substep=data.get("max_events_per_substep", 8),
-            broadphase=data.get("broadphase", "spatial_hash"),
-            broadphase_cell_size=data.get("broadphase_cell_size", 0.0),
-            render_fps=data.get("render_fps", 24),
-            duration=data.get("duration", 3.5),
+            physics_dt=data.get("physics_dt", defaults.physics_dt),
+            substeps=data.get("substeps", defaults.substeps),
+            iterations=data.get("iterations", defaults.iterations),
+            baumgarte=data.get("baumgarte", defaults.baumgarte),
+            slop=data.get("slop", defaults.slop),
+            restitution_threshold=data.get(
+                "restitution_threshold", defaults.restitution_threshold
+            ),
+            gravity=data.get("gravity", defaults.gravity),
+            ground_z=data.get("ground_z", defaults.ground_z),
+            ground_friction=data.get("ground_friction", defaults.ground_friction),
+            ground_restitution=data.get(
+                "ground_restitution", defaults.ground_restitution
+            ),
+            linear_damping=data.get("linear_damping", defaults.linear_damping),
+            angular_damping=data.get("angular_damping", defaults.angular_damping),
+            allow_initial_overlap=data.get(
+                "allow_initial_overlap", defaults.allow_initial_overlap
+            ),
+            overlap_tolerance=data.get(
+                "overlap_tolerance", defaults.overlap_tolerance
+            ),
+            use_toi_splitting=data.get(
+                "use_toi_splitting", defaults.use_toi_splitting
+            ),
+            max_events_per_substep=data.get(
+                "max_events_per_substep", defaults.max_events_per_substep
+            ),
+            warm_start=data.get("warm_start", defaults.warm_start),
+            broadphase=data.get("broadphase", defaults.broadphase),
+            broadphase_cell_size=data.get(
+                "broadphase_cell_size", defaults.broadphase_cell_size
+            ),
+            render_fps=data.get("render_fps", defaults.render_fps),
+            duration=data.get("duration", defaults.duration),
         )
 
     def to_dict(self) -> dict:
@@ -653,6 +687,7 @@ class SimulationSpec:
             "overlap_tolerance": self.overlap_tolerance,
             "use_toi_splitting": self.use_toi_splitting,
             "max_events_per_substep": self.max_events_per_substep,
+            "warm_start": self.warm_start,
             "broadphase": self.broadphase,
             "broadphase_cell_size": self.broadphase_cell_size,
             "render_fps": self.render_fps,

@@ -28,7 +28,7 @@ from ..mathutils import quaternion as quat
 from ..mathutils import vec3
 from ..scene.scene_spec import SceneSpec, SimulationSpec
 from .body import RigidBody, make_ground_proxy
-from .broadphase import BruteForceBroadphase, SpatialHashBroadphase
+from .broadphase import BruteForceBroadphase, SpatialHashBroadphase, world_aabb
 from .contact import GROUND_BODY
 from .narrowphase import (
     GroundPlane,
@@ -90,6 +90,7 @@ class PhysicsWorld:
             baumgarte=simulation.baumgarte,
             slop=simulation.slop,
             restitution_threshold=simulation.restitution_threshold,
+            warm_start=simulation.warm_start,
         )
         # 宽阶段：决定"哪些物体对需要送进窄相"
         if simulation.broadphase == "brute":
@@ -136,7 +137,8 @@ class PhysicsWorld:
             if not is_supported(spec.geometry):
                 raise ValueError(
                     f"物体 '{spec.name}' 的几何类型 {spec.geometry.type_name!r} "
-                    f"暂未被窄相支持。当前支持球的全部组合，以及球-盒、盒-地面。"
+                    f"暂未被窄相支持。当前支持球 / 盒 / 凸包的任意两两组合，"
+                    f"以及三者各自与地面；柱与胶囊尚未实现。"
                 )
             bodies.append(RigidBody.from_object_spec(spec))
 
@@ -262,20 +264,54 @@ class PhysicsWorld:
                     body.orientation, body.angular_velocity, h
                 )
 
-    def _solve_current_contacts(self, h: float) -> int:
+    def _solve_current_contacts(
+        self, h: float, pairs: list[tuple[int, int]] | None = None
+    ) -> int:
         """检测并求解"此刻"存在的接触，返回参与求解的接触点数。
 
         参数
         ----
         h : 用于 Baumgarte 位置修正的子步时长（不是实际推进的时间）
+        pairs : 已有候选对。TOI 路径传进来的是**按本子步最大位移膨胀过**的集合
+            （真实接触的超集），这里再用"此刻"的真实 AABB 筛一遍。
+            传 None 时自行调用宽阶段，保持"一子步一次检测"的老路径不变。
         """
-        pairs = self.broadphase.candidate_pairs(self.bodies)
+        if pairs is None:
+            pairs = self.broadphase.candidate_pairs(self.bodies)
+        else:
+            pairs = self._pairs_inside_now(pairs)
         self.last_candidate_count = len(pairs)
 
         manifolds = detect_contacts(self.bodies, self.ground, pairs)
         if not manifolds:
             return 0
         return self.solver.solve(manifolds, self.get_body, h)
+
+    def _pairs_inside_now(self, pairs: list[tuple[int, int]]) -> list[tuple[int, int]]:
+        """把膨胀过的候选对筛回"此刻 AABB 真的相交"。
+
+        为什么需要筛
+        ------------
+        膨胀是为了不漏掉**未来**的碰撞，代价是放进一批当前还没贴近的对。
+        这些多余的对照样要走窄相：盒-盒是 SAT、球-凸包要算最近点，都不是免费的。
+
+        为什么这样筛是对的
+        ------------------
+        一是**不漏**：膨胀量是本子步内任意点的位移上界，所以"现在相交"必然
+        蕴含"在膨胀盒里相交"；AABB 相交又是接触的必要条件，两步都不会误杀。
+        二是**等价**：真实 AABB + 无余量的判据，正是原先 ``candidate_pairs()``
+        交付给窄相的那个集合，因此接触流形逐位不变。
+
+        全体 AABB 只算一遍（O(N)），配对筛选是 O(P) 的纯区间比较，比再跑一次
+        空间哈希便宜得多。顺序保持不变：``detect_contacts`` 靠 (i, j) 的字典序
+        决定求解次序，重排会让数值结果漂移。
+        """
+        boxes = [world_aabb(body) for body in self.bodies]
+        return [
+            (index_a, index_b)
+            for index_a, index_b in pairs
+            if boxes[index_a].overlaps(boxes[index_b])
+        ]
 
     def substep(self, h: float) -> int:
         """执行一个子步，返回参与求解的接触点数。
@@ -284,6 +320,8 @@ class PhysicsWorld:
         若场景里关闭了 ``use_toi_splitting``，则退化为"一次检测 + 一次联立求解"。
         """
         self._integrate_velocities(h)
+        # 一个子步内可能求解多次（TOI 切分），但暖启动只允许发生一次
+        self.solver.begin_substep()
 
         if not self.simulation.use_toi_splitting:
             contact_count = self._solve_current_contacts(h)
@@ -293,6 +331,31 @@ class PhysicsWorld:
 
         self.time += h
         return contact_count
+
+    def _swept_pairs(self, h: float) -> list[tuple[int, int]]:
+        """给 TOI 用的候选对：AABB 按"本子步最大位移"膨胀。
+
+        为什么不能直接复用窄相的候选对
+        ------------------------------
+        窄相的 AABB 是**此刻**的包络，只回答"现在重叠吗"。TOI 要回答的是"这个
+        子步里会不会碰上"——一个 10 m/s 的球在 h=1.4 ms 内走 14 mm，若它此刻离
+        别的物体还有 10 mm，两者的 AABB 并不重叠，但那一子步里确实会撞上。
+        只查"现在重叠"的候选对，就会漏掉高速碰撞，而这正是 TOI 存在的理由。
+
+        所以每个物体的 AABB 按 ``(|v| + |ω|R)·h`` 膨胀——这是物体上任意一点在
+        这一子步内的位移上界，膨胀后的候选对是真实接触的**超集**。
+        """
+        inflation: list[float] = []
+        for body in self.bodies:
+            if body.is_static:
+                inflation.append(0.0)
+                continue
+            omega = body.angular_velocity
+            spin = math.sqrt(
+                omega[0] * omega[0] + omega[1] * omega[1] + omega[2] * omega[2]
+            ) * body.bounding_radius
+            inflation.append((body.speed() + spin) * h)
+        return self.broadphase.candidate_pairs(self.bodies, inflation=inflation)
 
     def _solve_with_toi(self, h: float) -> int:
         """把子步按预测接触时刻切成若干段，逐段求解。
@@ -325,14 +388,24 @@ class PhysicsWorld:
         ----
         int : 本子步内累计求解的接触点数
         """
-        total = self._solve_current_contacts(h)
+        # 候选对按"物体在这一段里最多走多远"膨胀。**每次事件后必须重算**：
+        # 一次碰撞可以在子步中途把静止物体的速度从 0 变成几十 m/s，随后它才会
+        # 去撞下一个物体。若沿用事件前的候选对（那时它速度为 0、膨胀量也是 0），
+        # 链条的第二环就查不到——牛顿摆只会飞出一个球。
+        #
+        # 同一套候选对也喂给窄相（再按真实 AABB 筛一遍），省掉一整个子步里
+        # 那次重复的空间哈希。膨胀量覆盖了本子步内的全部位移，所以事件后
+        # 位置再怎么走，真实 AABB 都还在膨胀盒里面，不会漏。
+        pairs = self._swept_pairs(h)
+
+        total = self._solve_current_contacts(h, pairs)
 
         remaining = h
         events = 0
         max_events = self.simulation.max_events_per_substep
 
         while remaining > _MIN_TIME and events < max_events:
-            hit = earliest_toi(self.bodies, self.ground, remaining)
+            hit = earliest_toi(self.bodies, self.ground, remaining, pairs)
             if hit is None:
                 # 剩余时间内不会再发生碰撞，直接走完
                 break
@@ -341,8 +414,10 @@ class PhysicsWorld:
             self._integrate_positions(step_time)
             remaining -= step_time
 
-            total += self._solve_current_contacts(h)
+            total += self._solve_current_contacts(h, pairs)
             events += 1
+            if remaining > _MIN_TIME and events < max_events:
+                pairs = self._swept_pairs(remaining)
 
         if remaining > _MIN_TIME:
             self._integrate_positions(remaining)

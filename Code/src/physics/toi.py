@@ -32,8 +32,17 @@ from __future__ import annotations
 
 import math
 
-from ..geom.geometry import BoxGeometry, ConvexHullGeometry, SphereGeometry
-from .body import RigidBody
+from ..mathutils import vec3
+from ..geom.geometry import (
+    BoxGeometry,
+    CapsuleGeometry,
+    CompoundGeometry,
+    ConvexHullGeometry,
+    CylinderGeometry,
+    SphereGeometry,
+)
+from . import gjk as _gjk
+from .body import RigidBody, iter_parts
 from .convex_sat import (
     Polytope,
     candidate_axes,
@@ -44,6 +53,10 @@ from .convex_sat import (
     _separation,
 )
 from .narrowphase import GroundPlane
+from .support import support_world
+
+#: 侧面是曲面的几何：没有有限 SAT 轴集合，TOI 走"GJK 距离 + 保守推进"。
+_CURVED = (CylinderGeometry, CapsuleGeometry)
 
 #: 判定"相对速度可忽略"的阈值（m/s）。低于此值不认为会再次碰撞。
 _MIN_CLOSING_SPEED_SQUARED = 1e-20
@@ -451,6 +464,178 @@ def sphere_hull_toi(
     return t
 
 
+def curved_pair_toi(
+    body_a: RigidBody,
+    body_b: RigidBody,
+    max_time: float,
+    cache: dict | None = None,
+) -> float | None:
+    """含柱/胶囊的物体对：GJK 距离 + **保守推进**（永不偏晚）。
+
+    为什么曲面不能用 SAT 那套
+    ------------------------
+    SAT 的前提是"有限条候选轴"：多面体的棱与面能生成这几条轴，曲面生成不了
+    （柱的侧面有无穷多条法向）。硬凑一个有限集会给出**偏晚**的 TOI，而偏晚
+    等于漏切分——牛顿摆会一次飞出两个球。
+
+    这里改用间隙收缩速率的严格上界：
+
+        gap(t) ≥ gap - ( max(0, (v_B - v_A)·n) + |ω_A|R_A + |ω_B|R_B ) · t
+
+    右边括号里是"任何一点的相对速度沿法向投影"的上界（自转对一个点的贡献
+    不超过 ``|ω|R``）。于是 ``t = gap / closing`` 一定**不晚于**真实接触时刻，
+    属于"保守"一档：偏早只会多重切一刀，代价是一两次多余的窄相查询。
+
+    对称性
+    ------
+    ``distance`` 对称、``(v_B - v_A)·n`` 交换后符号同时翻转，所以
+    ``curved_pair_toi(a, b)`` 与 ``curved_pair_toi(b, a)`` 逐位相等——
+    能力表测试会检查这一点。
+    """
+    gap, point_a, point_b, _simplex = _gjk.distance(body_a, body_b)
+    if gap <= _TOUCH_EPS:
+        return None
+
+    delta = vec3.sub(point_b, point_a)
+    length = vec3.length(delta)
+    if length <= _MIN_CLOSING:
+        return None
+    normal = (delta[0] / length, delta[1] / length, delta[2] / length)
+
+    relative_x = body_b.linear_velocity[0] - body_a.linear_velocity[0]
+    relative_y = body_b.linear_velocity[1] - body_a.linear_velocity[1]
+    relative_z = body_b.linear_velocity[2] - body_a.linear_velocity[2]
+
+    # 法向是 A→B，所以"接近"是相对速度在 -n 上的投影
+    closing = max(
+        0.0,
+        -(
+            relative_x * normal[0]
+            + relative_y * normal[1]
+            + relative_z * normal[2]
+        ),
+    ) + _spin_tip_speed(body_a) + _spin_tip_speed(body_b)
+    if closing <= _MIN_CLOSING:
+        return None
+
+    # 多推进一点穿透，让窄相能报出"真实穿透"（见 _CONTACT_OVERLAP 的说明）
+    t = (gap + _CONTACT_OVERLAP) / closing
+    if t <= _MIN_TOI or t > max_time:
+        return None
+    return t
+
+
+def curved_ground_toi(
+    body: RigidBody,
+    ground: GroundPlane,
+    max_time: float,
+    cache: dict | None = None,
+) -> float | None:
+    """柱/胶囊与水平地面：支撑点最低高度 + 保守推进。
+
+    最低点用 ``support(-Z)`` 直接取到（对柱是端面圆周上的精确最低点，对胶囊
+    是端球底部），所以间隙是精确的；不确定的只有"它下降得多快"，用
+    ``max(0, -v_z) + |ω|R`` 作为上界，因此整体是保守估计。
+    """
+    lowest = support_world(body, (0.0, 0.0, -1.0))
+    gap = lowest[2] - ground.z
+    if gap <= _TOUCH_EPS:
+        return None
+
+    closing = max(0.0, -body.linear_velocity[2]) + _spin_tip_speed(body)
+    if closing <= _MIN_CLOSING:
+        return None
+
+    t = (gap + _CONTACT_OVERLAP) / closing
+    if t <= _MIN_TOI or t > max_time:
+        return None
+    return t
+
+
+def compound_pair_toi(
+    body_a: RigidBody,
+    body_b: RigidBody,
+    max_time: float,
+    cache: dict | None = None,
+) -> float | None:
+    """复合体参与的一对刚体：逐部件对预测，取**最小**时刻。
+
+    取最小是对的：任何一对部件先碰上，那次碰撞就是真实事件，必须在那一刻
+    切开子步。取错了（比如取首个非空结果）会让后发生的部件碰撞被提前处理，
+    表现为"还没接触就被弹开"。
+
+    部件速度用 ``v + ω × r`` 换算（见 ``body.PartView``）。用整体质心速度会
+    得出"旋转中的哑铃没有接近"——高速自转的复合体就会穿模。
+    """
+    earliest: float | None = None
+    window = max_time
+
+    for _index_a, view_a in iter_parts(body_a):
+        for _index_b, view_b in iter_parts(body_b):
+            t = _dispatch_toi(view_a, view_b, window, cache)
+            if t is not None and (earliest is None or t < earliest):
+                earliest = t
+                window = t    # 窗口收窄：后续只关心更早的事件
+
+    return earliest
+
+
+def compound_ground_toi(
+    body: RigidBody,
+    ground: GroundPlane,
+    max_time: float,
+    cache: dict | None = None,
+) -> float | None:
+    """复合体与地面：逐部件预测，取最早时刻。"""
+    earliest: float | None = None
+    window = max_time
+
+    for _index, view in iter_parts(body):
+        t = ground_toi(view, ground, window, cache)
+        if t is not None and (earliest is None or t < earliest):
+            earliest = t
+            window = t
+
+    return earliest
+
+
+def may_collide(body_a: RigidBody, body_b: RigidBody, max_time: float) -> bool:
+    """包围球层面的**精确**拒绝：这对物体在 ``max_time`` 内不可能相碰。
+
+    为什么这层剪枝值得单独写
+    ------------------------
+    ``earliest_toi`` 是 O(N²) 的：N 个物体就是 N(N-1)/2 对，每一对都可能去算
+    "球心到多面体最近点"（要遍历所有面、还要做多边形投影）。56 个物体的堆积
+    场景里，单次子步有 1 534 对，其中绝大多数相隔很远、**根本不可能在这一子步里
+    碰上**，却在做完整的最近点计算。剖析显示它是单步耗时的 98%（见
+    ``docs/14`` 的性能一节）。
+
+    判据是严格的：物体各自被包围球包住，包围球都不相交 ⇒ 物体必然不接触。
+    而包围球**不旋转**，球心距离的变化速率不超过相对平动速度
+    ``|Δv|``。于是"``R_a + R_b + |Δv|·t`` 仍然小于球心距"就意味着到 ``t`` 为
+    止都不可能有事件。这里连 ``sqrt`` 都不做：用 L1 范数作 ``|Δv|`` 的上界，
+    再比较平方。
+
+    这一步不会改变任何结果，只是把"算不出来的拒绝"提前成"一眼看得出"。
+    """
+    pa = body_a.position
+    pb = body_b.position
+    dx = pb[0] - pa[0]
+    dy = pb[1] - pa[1]
+    dz = pb[2] - pa[2]
+    distance_sq = dx * dx + dy * dy + dz * dz
+
+    reach = body_a.geometry.bounding_radius() + body_b.geometry.bounding_radius()
+    va = body_a.linear_velocity
+    vb = body_b.linear_velocity
+    # L1 ≥ L2，所以它是相对速度的严格上界，不需要开方
+    relative_speed = (
+        abs(vb[0] - va[0]) + abs(vb[1] - va[1]) + abs(vb[2] - va[2])
+    )
+    limit = reach + relative_speed * max_time
+    return distance_sq <= limit * limit
+
+
 def body_toi(
     body_a: RigidBody,
     body_b: RigidBody,
@@ -461,10 +646,37 @@ def body_toi(
 
     球-球走精确的一元二次方程；含球的其他组合走"最近点 + 法向"；其余走
     ``hull_hull_toi`` 的保守轴推进。三种路径的共同要求是**不偏晚**。
+
+    进入分派前先做一次包围球拒绝（:func:`may_collide`）——它不改结果，只把
+    绝大多数"隔着半个场景"的物体对挡在外面。
+    """
+    if not may_collide(body_a, body_b, max_time):
+        return None
+    return _dispatch_toi(body_a, body_b, max_time, cache)
+
+
+def _dispatch_toi(
+    body_a: RigidBody,
+    body_b: RigidBody,
+    max_time: float,
+    cache: dict | None = None,
+) -> float | None:
+    """按几何类型分派，**不做**包围球预判。
+
+    单独拆出来是给 :func:`earliest_toi` 用的：那里已经把同一个判断内联进了内层
+    循环（省掉一次函数调用），再走一遍 :func:`may_collide` 属于重复计算。
     """
     a_is_sphere = isinstance(body_a.geometry, SphereGeometry)
     b_is_sphere = isinstance(body_b.geometry, SphereGeometry)
+    a_is_curved = isinstance(body_a.geometry, _CURVED)
+    b_is_curved = isinstance(body_b.geometry, _CURVED)
 
+    if isinstance(body_a.geometry, CompoundGeometry) or isinstance(
+        body_b.geometry, CompoundGeometry
+    ):
+        return compound_pair_toi(body_a, body_b, max_time, cache)
+    if a_is_curved or b_is_curved:
+        return curved_pair_toi(body_a, body_b, max_time, cache)
     if a_is_sphere and b_is_sphere:
         return sphere_sphere_toi(body_a, body_b, max_time)
     if a_is_sphere:
@@ -480,7 +692,11 @@ def ground_toi(
     max_time: float,
     cache: dict | None = None,
 ) -> float | None:
-    """刚体与地面的接触时刻（球走一元一次，其余走顶点精确解）。"""
+    """刚体与地面的接触时刻（球走一元一次，柱/胶囊走支撑点，其余走顶点解）。"""
+    if isinstance(body.geometry, CompoundGeometry):
+        return compound_ground_toi(body, ground, max_time, cache)
+    if isinstance(body.geometry, _CURVED):
+        return curved_ground_toi(body, ground, max_time, cache)
     if isinstance(body.geometry, SphereGeometry):
         return sphere_ground_toi(body, ground, max_time)
     return hull_ground_toi(body, ground, max_time, cache)
@@ -490,6 +706,7 @@ def earliest_toi(
     bodies: list[RigidBody],
     ground: GroundPlane | None,
     max_time: float,
+    pairs: list[tuple[int, int]] | None = None,
 ) -> tuple[float, str] | None:
     """找出整个场景中最早发生的接触事件。
 
@@ -498,11 +715,20 @@ def earliest_toi(
     bodies   : 刚体列表
     ground   : 地面；None 表示自由空间
     max_time : 时间窗口（秒）
+    pairs    : 可选候选对。给定后只检查这些对——由宽阶段把 AABB 按"本子步最大
+               位移"膨胀后给出，是**超集**（不会漏事件），但把 O(N²) 降成了 O(邻居)。
+               为 ``None`` 时退化为全枚举，供单元测试与小型场景使用。
 
     返回
     ----
     (时刻, 描述) 二元组；没有任何事件时返回 None。
     描述字符串仅用于日志与调试（例如 ``'ball_a' <-> 'ball_b'``）。
+
+    为什么内层要摊平
+    ----------------
+    这是全流程里唯一还在 O(N²) 上跑循环的地方。循环体里每多一次属性访问或方法
+    调用，就乘以 N²/2 次——56 个物体时是 1 534 次/子步，500 个物体时是 124 750 次。
+    所以位置、速度、半径、静态标记在循环**之前**取成元组，内层只做算术。
     """
     best_time: float | None = None
     best_label = ""
@@ -511,26 +737,58 @@ def earliest_toi(
     # 同一次调用内复用世界坐标多面体：每对物体都要用，重建 N-1 次是浪费
     cache: dict = {}
 
-    for i in range(count):
-        body_i = bodies[i]
+    # 内层循环的摊平数据（见上面"为什么内层要摊平"）
+    flat = [
+        (
+            body.position[0], body.position[1], body.position[2],
+            body.linear_velocity[0], body.linear_velocity[1], body.linear_velocity[2],
+            body.bounding_radius,
+            body.is_static,
+        )
+        for body in bodies
+    ]
 
-        if ground is not None and not body_i.is_static:
-            t = ground_toi(body_i, ground, max_time, cache)
-            if t is not None and (best_time is None or t < best_time):
-                best_time = t
-                best_label = f"地面 <-> '{body_i.name}'"
-
-        for j in range(i + 1, count):
-            body_j = bodies[j]
-            if body_i.is_static and body_j.is_static:
+    if ground is not None:
+        for body in bodies:
+            if body.is_static:
                 continue
-
-            # 用剩余时间窗口做剪枝：已经找到更早的事件就不必再算
-            window = max_time if best_time is None else min(best_time, max_time)
-            t = body_toi(body_i, body_j, window, cache)
+            t = ground_toi(body, ground, max_time, cache)
             if t is not None and (best_time is None or t < best_time):
                 best_time = t
-                best_label = f"'{body_i.name}' <-> '{body_j.name}'"
+                best_label = f"地面 <-> '{body.name}'"
+
+    if pairs is None:
+        candidate_iter = (
+            (i, j) for i in range(count) for j in range(i + 1, count)
+        )
+    else:
+        candidate_iter = pairs
+
+    for i, j in candidate_iter:
+        xi, yi, zi, vxi, vyi, vzi, ri, static_i = flat[i]
+        xj, yj, zj, vxj, vyj, vzj, rj, static_j = flat[j]
+        if static_i and static_j:
+            continue
+
+        # 已经找到更早的事件时，窗口收窄，剪枝更狠
+        window = max_time if best_time is None else (
+            best_time if best_time < max_time else max_time
+        )
+
+        # 包围球拒绝（同 may_collide，但内联以省掉 N² 次函数调用）
+        dx = xj - xi
+        dy = yj - yi
+        dz = zj - zi
+        limit = ri + rj + (
+            abs(vxj - vxi) + abs(vyj - vyi) + abs(vzj - vzi)
+        ) * window
+        if dx * dx + dy * dy + dz * dz > limit * limit:
+            continue
+
+        t = _dispatch_toi(bodies[i], bodies[j], window, cache)
+        if t is not None and (best_time is None or t < best_time):
+            best_time = t
+            best_label = f"'{bodies[i].name}' <-> '{bodies[j].name}'"
 
     if best_time is None:
         return None
