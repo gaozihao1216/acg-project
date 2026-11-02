@@ -467,17 +467,25 @@ class PhysicsWorld:
         return self.total_kinetic_energy() + self.total_potential_energy()
 
     def max_penetration(self) -> float:
-        """当前所有接触中最深的穿透深度（米）。
+        """当前所有接触中最深的穿透深度（米），**取最大**。
+
+        覆盖地面接触与物体间接触两类，返回二者的最大值：
+
+        - 有地面：``detect_contacts`` 本来就会同时产出地面流形和物体对流形，
+          所以直接取全部流形的最大深度即可；
+        - 自由空间（``ground is None``）：只剩物体对，同样取最大。
+
+        这个指标是用来判定"有没有陷进去"的，任何一类接触漏算都会让断言
+        **恒为 0 而假通过**。早先这里在 ``ground is None`` 时直接返回 0——
+        一个自由空间场景调用它，得到的不是"没有穿透"，而是"根本没检测"。
 
         静置阶段这个值应当稳定在 ``slop`` 附近，若有持续增长说明
         Baumgarte 不足或迭代次数太少。
         """
-        if self.ground is None:
-            return 0.0
         manifolds = detect_contacts(self.bodies, self.ground)
         if not manifolds:
             return 0.0
-        return max(m.deepest.penetration for m in manifolds)
+        return max(manifold.deepest.penetration for manifold in manifolds)
 
     def max_speed(self) -> float:
         """所有动态物体中最大的质心速度，用于判定是否已静置。"""
