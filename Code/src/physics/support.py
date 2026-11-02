@@ -187,14 +187,18 @@ def _feature_branches(
     |---|---|
     | 盒的顶点序号 ``4*ix + 2*iy + iz``、凸包的顶点下标 | **真特征**：体坐标系里固定的那个角 |
     | 圆柱 / 胶囊的母线端点序号 | **真特征**：体坐标系里固定的那一端 |
-    | 圆盘四点（柱端面、锥/台/冠底面） | **采样槽位**：``_RING_ANGLES`` 固定的 4 个角，但圆周起点由 ``vec3.orthogonal_basis(世界轴)`` 决定 |
+    | 圆盘四点（柱端面、锥/台/冠底面） | **体坐标槽位**：``_RING_ANGLES`` 固定的 4 个角，圆周起点由 :func:`_ring_basis` 固定在体坐标系 |
     | 严格凸体（球、椭球）与退化端面的单点 | 常量 ``_TAG_SINGLE``，只表示"本帧唯一的那个点" |
 
-    圆盘那一行是**已知边界**：``orthogonal_basis`` 按"轴的最小分量"挑辅助坐标轴，
-    轴方向跨越该分界时基底不连续，同一个圆周序号可能对应跳了很远的另一个位置
-    （实测两轴夹角 2e-8 时首点切向差 114°）。批内唯一性不受影响——四点仍是四个
-    不同标签——但它**不是**完整的持久接触身份。真正的跨帧匹配要靠两侧局部锚点 +
-    有效性检查（见 `docs/07` §4.1）。
+    圆盘这一行**曾经是**已知边界：圆周起点取自 ``vec3.orthogonal_basis(世界轴)``，
+    而该基按"轴的最小分量"挑辅助坐标轴，轴方向跨越分界时不连续——竖直圆柱绕 y
+    轴倾斜 ``1e-6`` rad，同一个 tag 的点就位移 0.424 m（盘面直径才 0.6 m）。现在
+    基固定在体坐标系，同一 tag 恒对应同一个体坐标槽位（实测 6 个姿态下体坐标
+    偏差 1.1e-16 m）。
+
+    但"体坐标稳定"仍不等于完整跨帧持久：端面 / 侧面 / 单点三种模式会互相切换
+    （标签整体换段），流形点数会变，P0-1 重建接触区域后采样点本身还会移动。
+    真正的持久匹配要靠两侧局部锚点 + 有效性检查（见 `docs/07` §4.2）。
 
     裁点那条性质仍然成立：倾斜时浅点被裁掉，剩余点的标签**不变**（是原子集的
     子集），不会像数组下标那样整体前移。
@@ -278,7 +282,7 @@ def _feature_branches(
             center = vec3.madd(
                 body.position, axis, half_height if cos_axis > 0.0 else -half_height
             )
-            e1, e2 = vec3.orthogonal_basis(axis)
+            e1, e2 = _ring_basis(body)
             return [
                 (vec3.add(center, _ring_offset(e1, e2, angle, radius)), cap * 4 + step)
                 for step, angle in enumerate(_RING_ANGLES)
@@ -320,16 +324,16 @@ def _feature_branches(
     if isinstance(geometry, ConeGeometry):
         if cos_axis <= -_FACE_COS_TOL:
             # 底面正对方向：整个底面圆盘等深，圆周取 4 点才撑得住"平放不翻"
-            return _face_ring(body, axis, geometry._base_z, geometry.radius, 0)
+            return _face_ring(body, geometry._base_z, geometry.radius, 0)
         # 其余方向（含顶点朝下）只有一个支撑点：圆锥是"圆盘 + 顶点"的凸包，
         # 支撑集要么是整块底面，要么是单点，不会出现线段
         return [(support_world(body, direction), _TAG_SINGLE)]
 
     if isinstance(geometry, FrustumGeometry):
         if cos_axis <= -_FACE_COS_TOL:
-            return _face_ring(body, axis, geometry._bottom_z, geometry.bottom_radius, 0)
+            return _face_ring(body, geometry._bottom_z, geometry.bottom_radius, 0)
         if cos_axis >= _FACE_COS_TOL:
-            return _face_ring(body, axis, geometry._top_z, geometry.top_radius, 4)
+            return _face_ring(body, geometry._top_z, geometry.top_radius, 4)
         # 斜着支撑时最大值落在某条端面圆周上，是**一个**点（圆台侧面是直纹面，
         # 但只有沿母线方向才会退化成线段，而那条线段的深度并不相同）
         return [(support_world(body, direction), _TAG_SINGLE)]
@@ -337,13 +341,33 @@ def _feature_branches(
     if isinstance(geometry, SphericalCapGeometry):
         if cos_axis <= -_FACE_COS_TOL:
             # 平底正对方向：底面圆盘就是接触面
-            return _face_ring(body, axis, geometry._base_z, geometry._rim_radius, 0)
+            return _face_ring(body, geometry._base_z, geometry._rim_radius, 0)
         return [(support_world(body, direction), _TAG_SINGLE)]
 
     raise TypeError(f"不支持支撑特征采样的几何类型：{type(geometry).__name__}")
 
 
-def _face_ring(body, axis, center_local_z: float, radius: float, base_tag: int):
+def _ring_basis(body):
+    """端面圆周采样的两个切向：**固定在体坐标系**里。
+
+    为什么不能用 ``vec3.orthogonal_basis(世界轴)``：它按"轴的最小分量"挑辅助
+    坐标轴，轴方向跨越该分界时基底不连续。实测竖直圆柱绕 y 轴倾斜 ``1e-6`` rad，
+    同一个 tag 的点位移 **0.424 m**（盘面直径才 0.6 m）——标签没变，位置换了。
+
+    固定在体坐标系之后，同一个 tag 恒对应同一个**体坐标**槽位；物体怎么转，
+    槽位跟着转，这才是"几何特征"该有的行为。
+
+    取 ``(0,1,0)`` / ``(-1,0,0)`` 而不是 ``(1,0,0)`` / ``(0,1,0)``，是因为
+    ``orthogonal_basis((0,0,1))`` 恰好返回这两个方向——这样未旋转物体上的
+    采样点与改造前逐位相同，把这次改动的影响限制在"带姿态的物体"上。
+    """
+    return (
+        quat.quat_rotate_vector(body.orientation, (0.0, 1.0, 0.0)),
+        quat.quat_rotate_vector(body.orientation, (-1.0, 0.0, 0.0)),
+    )
+
+
+def _face_ring(body, center_local_z: float, radius: float, base_tag: int):
     """端面接触：把该端面的圆周等角取 4 点（世界坐标），各带标签 ``base_tag + 序号``。
 
     取 4 点是"够用"而不是"精确"：端面是个圆盘，理论上无穷多点等深。4 个等分点
@@ -354,7 +378,11 @@ def _face_ring(body, axis, center_local_z: float, radius: float, base_tag: int):
     与坐标轴方向重合的接触点——那种对齐会让求解器的摩擦约束出现方向退化。
 
     标签用**固定的角度序号**而不是"当前列表里的第几个"：倾斜裁掉一个浅点后，
-    剩下三个点的标签仍是它们原来那三个，暖启动不会串位。
+    剩下三个点的标签仍是它们原来那三个，暖启动不会串位。圆周起点由
+    :func:`_ring_basis` 固定在体坐标系，于是同一个标签也恒对应同一个体坐标槽位。
+
+    注意：``narrowphase.collide_cylinder_ground`` **不用**这里——它按世界系求
+    倾斜圆柱的真实最低点（``theta0``），那个最优性不能用固定槽位替代。
     """
     if radius <= _EPS:
         # 退化端面（圆锥的顶点、圆台的 0 半径端）：没有圆周可取
@@ -362,7 +390,7 @@ def _face_ring(body, axis, center_local_z: float, radius: float, base_tag: int):
         return [(center, _TAG_SINGLE)]
 
     center = _local_to_world(body, (0.0, 0.0, center_local_z))
-    e1, e2 = vec3.orthogonal_basis(axis)
+    e1, e2 = _ring_basis(body)
     return [
         (vec3.add(center, _ring_offset(e1, e2, angle, radius)), base_tag + step)
         for step, angle in enumerate(_RING_ANGLES)

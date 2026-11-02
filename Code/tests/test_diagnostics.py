@@ -16,6 +16,7 @@
 
 from __future__ import annotations
 
+import math
 import os
 import sys
 
@@ -24,7 +25,7 @@ _CODE_ROOT = os.path.dirname(_HERE)
 if _CODE_ROOT not in sys.path:
     sys.path.insert(0, _CODE_ROOT)
 
-from src.geom.geometry import SphereGeometry
+from src.geom.geometry import BoxGeometry, SphereGeometry
 from src.physics.body import RigidBody
 from src.physics.narrowphase import GroundPlane, detect_contacts
 from src.physics.world import PhysicsWorld
@@ -49,7 +50,12 @@ def _world(bodies, ground):
 
 
 def _reference(world) -> float:
-    """独立算一遍：直接取全部流形的最大深度，作为对照。"""
+    """直接从窄相流形汇总最大深度，作为**包装层**对照。
+
+    它和 ``max_penetration()`` 调的是同一个 ``detect_contacts``，所以只验证
+    "包装有没有把结果汇总对"，不验证窄相本身——窄相的正确性由本文件里球-球、
+    球-地面的解析期望值，以及各自的专项测试负责。
+    """
     manifolds = detect_contacts(world.bodies, world.ground)
     if not manifolds:
         return 0.0
@@ -158,11 +164,47 @@ def test_takes_max_of_both() -> tuple[bool, str]:
     )
 
 
+def test_multipoint_manifold_takes_deepest() -> tuple[bool, str]:
+    """多点流形上必须取**最深**的那个点，不是第一个、也不是平均。
+
+    前面几项都是球的单点接触，覆盖不到这一点。这里把盒子绕 x 轴倾 0.02 rad、
+    球心落到 z=0.29：底面四角全部陷进地面，但深度分两档（约 15.9 mm / 3.9 mm）。
+    指标必须等于这一档里的最大值，而不是最浅值或均值。
+    """
+    tilt = 0.02
+    orientation = (math.cos(0.5 * tilt), math.sin(0.5 * tilt), 0.0, 0.0)
+    box = RigidBody(
+        name="box",
+        geometry=BoxGeometry((0.6, 0.6, 0.6)),
+        mass=1.0,
+        position=(0.0, 0.0, 0.29),
+        orientation=orientation,
+    )
+    world = _world([box], GroundPlane(z=0.0))
+    manifolds = detect_contacts(world.bodies, world.ground)
+    depths = [point.penetration for manifold in manifolds for point in manifold.points]
+    if len(depths) < 2:
+        return False, f"倾斜盒应给出多点流形，实际 {len(depths)} 点"
+
+    deepest = max(depths)
+    shallowest = min(depths)
+    reported = world.max_penetration()
+    ok = (
+        deepest - shallowest > 1e-3          # 确实有深浅两档，不是退化成一点
+        and abs(reported - deepest) < 1e-12  # 取的是最大，不是最小/平均
+    )
+    return ok, (
+        f"{len(depths)} 点，深度区间 [{shallowest * 1000:.3f}, {deepest * 1000:.3f}] mm，"
+        f"指标={reported * 1000:.3f} mm（应等于最深点）"
+    )
+
+
 CHECKS = [
     ("1. 自由空间两球重叠 0.05 m", test_free_space_overlap),
     ("2. 自由空间不接触返回 0", test_free_space_no_contact),
     ("3. 有地面时仍报出穿透", test_ground_still_reported),
     ("4. 地面与物-物同时存在取最大", test_takes_max_of_both),
+    ("5. 多点流形取最深点", test_multipoint_manifold_takes_deepest),
 ]
 
 

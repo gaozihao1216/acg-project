@@ -29,6 +29,7 @@ _CODE_ROOT = os.path.dirname(_HERE)
 if _CODE_ROOT not in sys.path:
     sys.path.insert(0, _CODE_ROOT)
 
+from src.mathutils import quaternion as quat
 from src.geom.geometry import (
     BoxGeometry,
     CapsuleGeometry,
@@ -292,39 +293,96 @@ def test_all_tags_within_limit() -> tuple[bool, str]:
 
 
 # ---------------------------------------------------------------------------
-# 7. 已知边界：圆盘标签是"采样槽位"
+# 7. 圆盘采样槽位：固定在体坐标系
 # ---------------------------------------------------------------------------
 
-def test_ring_tags_are_slots_not_features() -> tuple[bool, str]:
-    """圆盘四点的标签是采样槽位，不是稳定的几何特征（钉住当前边界）。
+def _tilt(axis, angle):
+    """绕单位轴转 ``angle`` 的四元数 ``(w, x, y, z)``。"""
+    half = 0.5 * angle
+    s = math.sin(half)
+    return (math.cos(half), axis[0] * s, axis[1] * s, axis[2] * s)
 
-    圆周起点由 ``vec3.orthogonal_basis(世界轴)`` 决定，它按"轴的最小分量"挑
-    辅助坐标轴；轴方向跨越该分界时基底不连续。实测：竖直圆柱绕 y 轴倾斜
-    ``1e-6`` rad，tag=0 的点从 (+x, +y) 跳到 (+x, −y)，位移接近盘面直径。
 
-    这条用例是**故意断言"会跳"**的：它记录当前实现的边界，不是期望行为。
-    将来把采样基改到体坐标系（正确的修法）之后本用例会失败——那时应把它改成
-    "不跳"，并同步 ``contact.py`` 的措辞与 `docs/07` §4.1。
+def _to_body_frame(body, point):
+    """世界点 → 体坐标：``R⁻¹ (p − x)``。"""
+    offset = (
+        point[0] - body.position[0],
+        point[1] - body.position[1],
+        point[2] - body.position[2],
+    )
+    return quat.quat_rotate_vector(quat.quat_conjugate(body.orientation), offset)
+
+
+def test_ring_tags_stay_in_body_frame() -> tuple[bool, str]:
+    """圆盘四点：同一个 tag 恒对应同一个**体坐标**槽位。
+
+    验收口径是局部坐标，不是世界坐标——物体转了，采样点本来就该跟着转：
+
+        p_local = R⁻¹ (p_world − x)
+
+    改造前圆周起点取自 ``vec3.orthogonal_basis(世界轴)``，它按"轴的最小分量"挑
+    辅助坐标轴，轴方向跨越该分界时基底不连续：竖直圆柱绕 y 轴倾斜 ``1e-6`` rad，
+    同一个 tag 的世界位置位移 **0.424 m**（盘面直径 0.6 m）。改到体坐标系后
+    这个跳变消失。
+
+    这只解决了"基底跳变"，**不等于**完整的跨帧持久性：端面 / 侧面 / 单点三种
+    模式之间仍会切换，流形点数仍会变，P0-1 重建接触区域后采样点本身还会变。
+    那些要靠局部锚点 + 有效性校验（`docs/07` §4.2）。
     """
     radius = 0.3
-    base = make_body(CylinderGeometry(radius, 1.0), 0.0)
-    tilt = 1e-6
-    turned = make_body(
-        CylinderGeometry(radius, 1.0),
-        0.0,
-        (math.cos(0.5 * tilt), 0.0, math.sin(0.5 * tilt), 0.0),
+    # 倾斜角必须留在端面模式的容差内（``_FACE_COS_TOL = 0.9986``，约 3°）：
+    # 超过就会被判成侧面/单点接触，那是另一种模式，不归这条用例管。
+    # 而基底跳变在 1e-6 rad 量级就会发生，所以这点角度足够暴露问题。
+    poses = (
+        ("恒等", (1.0, 0.0, 0.0, 0.0)),
+        ("绕 x 1e-6", _tilt((1.0, 0.0, 0.0), 1e-6)),
+        ("绕 y 1e-6", _tilt((0.0, 1.0, 0.0), 1e-6)),
+        ("绕 x 1e-3", _tilt((1.0, 0.0, 0.0), 1e-3)),
+        ("绕 y 1e-3", _tilt((0.0, 1.0, 0.0), 1e-3)),
+        ("绕 (0.6,0.8,0) 2.5e-3", _tilt((0.6, 0.8, 0.0), 2.5e-3)),
     )
-    before = {tag: point for point, tag in feature_world_tagged(base, (0.0, 0.0, -1.0))}
-    after = {tag: point for point, tag in feature_world_tagged(turned, (0.0, 0.0, -1.0))}
-    if 0 not in before or 0 not in after:
-        return False, "圆盘采样没有 tag=0 的点，无法比较"
 
-    jump = math.sqrt(sum((before[0][axis] - after[0][axis]) ** 2 for axis in range(3)))
-    unique_after = len(set(after)) == len(after)
-    ok = jump > 0.1 and unique_after
+    reference: dict[int, tuple[float, float, float]] = {}
+    worst_local = 0.0
+    worst_pose = ""
+    unique_ok = True
+
+    for name, orientation in poses:
+        body = make_body(CylinderGeometry(radius, 1.0), 0.0, orientation)
+        tagged = feature_world_tagged(body, (0.0, 0.0, -1.0))
+        tags = [tag for _point, tag in tagged]
+        unique_ok = unique_ok and len(tags) == len(set(tags))
+        if len(tagged) != 4:
+            return False, f"{name}：期望 4 点，实际 {len(tagged)} 点"
+
+        for point, tag in tagged:
+            local = _to_body_frame(body, point)
+            if tag not in reference:
+                reference[tag] = local
+                continue
+            deviation = math.sqrt(
+                sum((local[axis] - reference[tag][axis]) ** 2 for axis in range(3))
+            )
+            if deviation > worst_local:
+                worst_local = deviation
+                worst_pose = name
+
+    # 姿态确实改变了采样点的世界位置（否则这条用例等于没转）
+    flat_body = make_body(CylinderGeometry(radius, 1.0), 0.0)
+    turned_body = make_body(
+        CylinderGeometry(radius, 1.0), 0.0, _tilt((0.0, 1.0, 0.0), 1e-3)
+    )
+    flat_zero = dict((tag, point) for point, tag in feature_world_tagged(flat_body, (0.0, 0.0, -1.0)))[0]
+    turned_zero = dict((tag, point) for point, tag in feature_world_tagged(turned_body, (0.0, 0.0, -1.0)))[0]
+    world_moved = math.sqrt(
+        sum((flat_zero[axis] - turned_zero[axis]) ** 2 for axis in range(3))
+    )
+
+    ok = unique_ok and worst_local < 1e-9 and world_moved > 1e-5
     return ok, (
-        f"倾斜 {tilt:.0e} rad 后 tag=0 位移={jump:.4f} m"
-        f"（盘面直径 {2 * radius:.2f} m）；批内仍唯一={unique_after}"
+        f"6 个姿态 × 4 点：同一 tag 的体坐标最大偏差={worst_local:.3e} m"
+        f"（最差姿态 {worst_pose or '—'}）；批内唯一={unique_ok}；"
+        f"倾斜 1e-3 rad 后 tag=0 的世界位置移动了 {world_moved:.3e} m"
     )
 
 
@@ -423,7 +481,7 @@ CHECKS = [
     ("5. 绕自身轴自转时 ID 与位置配对一致", test_gjk_ids_stable_under_axis_spin),
     ("6. 零方向返回带标签", test_zero_direction_returns_tagged),
     ("7. 所有标签都在 TAG_LIMIT 内", test_all_tags_within_limit),
-    ("8. 圆盘标签是采样槽位（已知边界）", test_ring_tags_are_slots_not_features),
+    ("8. 圆盘标签在体坐标系里稳定", test_ring_tags_stay_in_body_frame),
     ("9. 偏心负载：缓存键数 = 接触点数", test_cache_keys_per_contact_point),
     ("10. 偏心负载：四点冲量分别存储", test_impulses_stored_separately),
 ]
