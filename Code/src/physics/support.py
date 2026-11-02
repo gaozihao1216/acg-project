@@ -54,6 +54,23 @@ _FACE_COS_TOL = 0.9986
 #: 同上：余弦落在这个带宽内认为"接近侧面接触"（约 3°），取 2 个母线端点。
 _SIDE_COS_TOL = 0.05
 
+#: 端面圆周采样角的序号是**标签**的一部分，所以这张表必须是常量：
+#: 45°/135°/225°/315° 避开 0°，免得立着的柱在 x/y 轴上留下与坐标轴对齐的接触点
+#: （那种对齐会让摩擦约束出现方向退化）。
+_RING_ANGLES = (
+    math.pi * 0.25,
+    math.pi * 0.75,
+    math.pi * 1.25,
+    math.pi * 1.75,
+)
+
+#: 回转体"母线端点"类标签的起点。端面环占用 0..7，这里错开。
+_TAG_SIDE = 8
+
+#: 单点（严格凸体的锥顶、斜撑时的圆台侧面）与退化端面的标签。
+#: 与端面环的 0..7 错开，是为了"端面接触 ↔ 单点接触"切换时不会撞上环上某一点。
+_TAG_SINGLE = 16
+
 
 def support_local(geometry, direction) -> tuple[float, float, float]:
     """几何体在**局部坐标**下沿 ``direction`` 的最远点。
@@ -95,7 +112,28 @@ def world_axis(body) -> tuple[float, float, float]:
 def feature_world(
     body, direction, tol: float = 1e-4
 ) -> list[tuple[float, float, float]]:
-    """沿 ``direction`` 的**支撑特征**：一组"几乎同样远"的表面点。
+    """沿 ``direction`` 的**支撑特征**点列，不带身份标签。
+
+    这是 :func:`feature_world_tagged` 的薄包装：只关心"哪里在接触"的调用方用它；
+    需要给接触点分配 ``feature_id`` 的调用方（地面接触、GJK 流形）必须用带标签的
+    版本，否则会退化成用数组下标当身份——那正是暖启动错配的根源。
+    """
+    return [point for point, _tag in feature_world_tagged(body, direction, tol)]
+
+
+#: 标签上限。``gjk._build_manifold`` 用 ``tag_a * TAG_LIMIT + tag_b`` 编码两侧。
+#:
+#: 512 的来源：凸包顶点数受 ``ConvexHullGeometry(max_faces=64)`` 约束，欧拉公式
+#: 给出 ``V = 2F - 4 ≈ 124`` 的上界，512 留了四倍余量。同时 511*512+511 = 262143
+#: 远小于组合体的部件偏移 ``narrowphase._PART_FEATURE_STRIDE``（1e6），
+#: 于是"部件对 × 局部 ID"的编码仍不会撞号。
+TAG_LIMIT = 512
+
+
+def feature_world_tagged(
+    body, direction, tol: float = 1e-4
+) -> list[tuple[tuple[float, float, float], int]]:
+    """沿 ``direction`` 的**支撑特征**：一组"几乎同样远"的表面点，各带一个标签。
 
     为什么需要它
     ------------
@@ -117,6 +155,20 @@ def feature_world(
     开始摇摆。
 
     返回的点都**在表面上**（不是中点），接触点由调用方在两侧之间取中点。
+
+    标签（``tag``）的语义
+    --------------------
+    标签在**同一个物体内唯一**，并且由几何特征本身决定，不看点在列表里的位置：
+
+    - 盒：局部顶点序号 ``4*ix + 2*iy + iz``（``ix/iy/iz`` 是该轴取正号与否）
+    - 凸包：``geometry.vertices`` 里的顶点下标
+    - 圆柱端面 / 圆锥与圆台的端面 / 球冠底面：``面序号 * 4 + 圆周序号``
+    - 圆柱与胶囊的母线端点：``_TAG_SIDE + 端点序号``
+    - 严格凸体（球、椭球）与退化端面：``0``
+
+    这条性质是 ``ContactPoint.feature_id`` 契约的实现基础：倾斜时浅点被裁掉，
+    剩下点的标签**不变**，于是暖启动不会把冲量喂到别的角上。若这里改成"按
+    返回列表的序号编号"，裁掉一个浅点就会让后面所有点的身份整体前移。
     """
     geometry = body.geometry
 
@@ -129,7 +181,7 @@ def feature_world(
         return [support_world(body, direction)]
 
     if isinstance(geometry, SphereGeometry):
-        return [support_world(body, direction)]
+        return [(support_world(body, direction), 0)]
 
     if isinstance(geometry, BoxGeometry):
         size = geometry.size
@@ -143,9 +195,11 @@ def feature_world(
             + abs(local_direction[2]) * half[2]
         )
         points = []
-        for sign_x in (-1.0, 1.0):
-            for sign_y in (-1.0, 1.0):
-                for sign_z in (-1.0, 1.0):
+        # 顶点标签 = 4*ix + 2*iy + iz：与 collide_box_ground 的枚举顺序同源，
+        # 于是"盒-地面"和"盒-盒"两条路径对同一个角给出同一个身份。
+        for index_x, sign_x in enumerate((-1.0, 1.0)):
+            for index_y, sign_y in enumerate((-1.0, 1.0)):
+                for index_z, sign_z in enumerate((-1.0, 1.0)):
                     vertex = (sign_x * half[0], sign_y * half[1], sign_z * half[2])
                     score = (
                         vertex[0] * local_direction[0]
@@ -153,7 +207,8 @@ def feature_world(
                         + vertex[2] * local_direction[2]
                     )
                     if best - score <= tol:
-                        points.append(_local_to_world(body, vertex))
+                        tag = 4 * index_x + 2 * index_y + index_z
+                        points.append((_local_to_world(body, vertex), tag))
         return points
 
     if isinstance(geometry, ConvexHullGeometry):
@@ -166,13 +221,14 @@ def feature_world(
                 + vertex[1] * local_direction[1]
                 + vertex[2] * local_direction[2],
                 vertex,
+                index,
             )
-            for vertex in geometry.vertices
+            for index, vertex in enumerate(geometry.vertices)
         ]
         best = max(item[0] for item in scored)
         return [
-            _local_to_world(body, vertex)
-            for score, vertex in scored
+            (_local_to_world(body, vertex), index)
+            for score, vertex, index in scored
             if best - score <= tol
         ]
 
@@ -186,27 +242,28 @@ def feature_world(
         half_height = 0.5 * geometry.height
         if abs(cos_axis) >= _FACE_COS_TOL:
             # 端面接触：圆周上等角取 4 点，足以撑住"平放不翻"
-            center = vec3.madd(body.position, axis, half_height if cos_axis > 0.0 else -half_height)
+            cap = 1 if cos_axis > 0.0 else 0
+            center = vec3.madd(
+                body.position, axis, half_height if cos_axis > 0.0 else -half_height
+            )
             e1, e2 = vec3.orthogonal_basis(axis)
             return [
-                vec3.add(center, _ring_offset(e1, e2, angle, radius))
-                for angle in (
-                    math.pi * 0.25,
-                    math.pi * 0.75,
-                    math.pi * 1.25,
-                    math.pi * 1.75,
-                )
+                (vec3.add(center, _ring_offset(e1, e2, angle, radius)), cap * 4 + step)
+                for step, angle in enumerate(_RING_ANGLES)
             ]
         if abs(cos_axis) <= _SIDE_COS_TOL:
             # 侧面接触：两条母线的端点
             radial = _radial_direction(direction, axis)
             return [
-                vec3.madd(
-                    vec3.madd(body.position, axis, sign * half_height), radial, radius
+                (
+                    vec3.madd(
+                        vec3.madd(body.position, axis, sign * half_height), radial, radius
+                    ),
+                    _TAG_SIDE + index,
                 )
-                for sign in (-1.0, 1.0)
+                for index, sign in enumerate((-1.0, 1.0))
             ]
-        return [support_world(body, direction)]
+        return [(support_world(body, direction), _TAG_SINGLE)]
 
     if isinstance(geometry, CapsuleGeometry):
         radius = geometry.radius
@@ -214,45 +271,48 @@ def feature_world(
         if abs(cos_axis) <= _SIDE_COS_TOL:
             radial = _radial_direction(direction, axis)
             return [
-                vec3.madd(
-                    vec3.madd(body.position, axis, sign * half_height), radial, radius
+                (
+                    vec3.madd(
+                        vec3.madd(body.position, axis, sign * half_height), radial, radius
+                    ),
+                    index,
                 )
-                for sign in (-1.0, 1.0)
+                for index, sign in enumerate((-1.0, 1.0))
             ]
-        return [support_world(body, direction)]
+        return [(support_world(body, direction), _TAG_SINGLE)]
 
     if isinstance(geometry, EllipsoidGeometry):
         # 椭球是严格凸的：任意方向只有一个支撑点
-        return [support_world(body, direction)]
+        return [(support_world(body, direction), 0)]
 
     if isinstance(geometry, ConeGeometry):
         if cos_axis <= -_FACE_COS_TOL:
             # 底面正对方向：整个底面圆盘等深，圆周取 4 点才撑得住"平放不翻"
-            return _face_ring(body, axis, geometry._base_z, geometry.radius)
+            return _face_ring(body, axis, geometry._base_z, geometry.radius, 0)
         # 其余方向（含顶点朝下）只有一个支撑点：圆锥是"圆盘 + 顶点"的凸包，
         # 支撑集要么是整块底面，要么是单点，不会出现线段
-        return [support_world(body, direction)]
+        return [(support_world(body, direction), _TAG_SINGLE)]
 
     if isinstance(geometry, FrustumGeometry):
         if cos_axis <= -_FACE_COS_TOL:
-            return _face_ring(body, axis, geometry._bottom_z, geometry.bottom_radius)
+            return _face_ring(body, axis, geometry._bottom_z, geometry.bottom_radius, 0)
         if cos_axis >= _FACE_COS_TOL:
-            return _face_ring(body, axis, geometry._top_z, geometry.top_radius)
+            return _face_ring(body, axis, geometry._top_z, geometry.top_radius, 4)
         # 斜着支撑时最大值落在某条端面圆周上，是**一个**点（圆台侧面是直纹面，
         # 但只有沿母线方向才会退化成线段，而那条线段的深度并不相同）
-        return [support_world(body, direction)]
+        return [(support_world(body, direction), _TAG_SINGLE)]
 
     if isinstance(geometry, SphericalCapGeometry):
         if cos_axis <= -_FACE_COS_TOL:
             # 平底正对方向：底面圆盘就是接触面
-            return _face_ring(body, axis, geometry._base_z, geometry._rim_radius)
-        return [support_world(body, direction)]
+            return _face_ring(body, axis, geometry._base_z, geometry._rim_radius, 0)
+        return [(support_world(body, direction), _TAG_SINGLE)]
 
     raise TypeError(f"不支持支撑特征采样的几何类型：{type(geometry).__name__}")
 
 
-def _face_ring(body, axis, center_local_z: float, radius: float):
-    """端面接触：把该端面的圆周等角取 4 点（世界坐标）。
+def _face_ring(body, axis, center_local_z: float, radius: float, base_tag: int):
+    """端面接触：把该端面的圆周等角取 4 点（世界坐标），各带标签 ``base_tag + 序号``。
 
     取 4 点是"够用"而不是"精确"：端面是个圆盘，理论上无穷多点等深。4 个等分点
     足以让法向约束张成整个平面，物体不会绕单点翻转；倾斜时其余点深度更浅，
@@ -260,22 +320,20 @@ def _face_ring(body, axis, center_local_z: float, radius: float):
 
     角度取 45°、135°、225°、315°：避开 0°，免得"立得笔直的柱"在 x/y 轴上留下
     与坐标轴方向重合的接触点——那种对齐会让求解器的摩擦约束出现方向退化。
+
+    标签用**固定的角度序号**而不是"当前列表里的第几个"：倾斜裁掉一个浅点后，
+    剩下三个点的标签仍是它们原来那三个，暖启动不会串位。
     """
     if radius <= _EPS:
         # 退化端面（圆锥的顶点、圆台的 0 半径端）：没有圆周可取
         center = _local_to_world(body, (0.0, 0.0, center_local_z))
-        return [center]
+        return [(center, _TAG_SINGLE)]
 
     center = _local_to_world(body, (0.0, 0.0, center_local_z))
     e1, e2 = vec3.orthogonal_basis(axis)
     return [
-        vec3.add(center, _ring_offset(e1, e2, angle, radius))
-        for angle in (
-            math.pi * 0.25,
-            math.pi * 0.75,
-            math.pi * 1.25,
-            math.pi * 1.75,
-        )
+        (vec3.add(center, _ring_offset(e1, e2, angle, radius)), base_tag + step)
+        for step, angle in enumerate(_RING_ANGLES)
     ]
 
 

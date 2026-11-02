@@ -146,17 +146,36 @@ def test_default_and_switch() -> tuple[bool, str]:
 # ---------------------------------------------------------------------------
 
 def test_reduces_sinking_at_low_iterations() -> tuple[bool, str]:
-    """3 层塔 + 每子步只迭代 1 次：暖启动必须明显减小下沉与残余速度。
+    """3 层塔 + 每子步只迭代 2 次：暖启动必须明显减小下沉与残余速度。
 
-    这是暖启动存在的理由：冷启动下每次迭代只从 0 往上爬一点，1 次迭代连
+    这是暖启动存在的理由：冷启动下每次迭代只从 0 往上爬一点，迭代太少连
     支撑重力的冲量都凑不齐，塔会持续下沉。
+
+    为什么用 2 次而不是 1 次
+    -----------------------
+    1 次迭代时，顺序冲量在"4 点共面"流形上连法向冲量的**分配**都没解出来
+    （四点支撑一个刚体是静不定问题），每个点的冲量是求解顺序的产物。把这种
+    未收敛的分布当暖启动初值没有意义：实测穿透只有 0.92 倍、末速 1.4 倍。
+
+    早先"1 次迭代暖启动好转 1.97 倍"的结论来自当时的实现——地面四点共用
+    ``feature_id=0``，缓存只存一个标量、暖启动再把它均摊回四个角，等于每帧
+    强行抹平分配。那不是暖启动的收益，而是恰好抹到了对称解上。
+
+    现在四点各带自己的顶点序号，暖启动恢复的是真实分布。同一场景实测：
+
+    ``iterations=1`` 穿透 2.618 → 2.398 mm、末速 0.0385 → 0.0279；
+    ``iterations=2`` 2.312 → 0.314 mm、0.0227 → 0.0000；
+    ``iterations=4`` 2.039 → 1.366 mm、0.0021 → 0.0000；
+    ``iterations=8`` 1.157 → 1.058 mm、0.0025 → 0.0000。
+
+    所以判据取 2 次：仍是"少迭代"的强约束，又足够让分配收敛。
     """
-    cold = PhysicsWorld.from_scene(tower_scene(3, 1, False, 0.6))
+    cold = PhysicsWorld.from_scene(tower_scene(3, 2, False, 0.6))
     advance(cold, 0.6)
     cold_pen = cold.max_penetration() * 1000.0
     cold_speed = max(body.speed() for body in cold.bodies)
 
-    warm = PhysicsWorld.from_scene(tower_scene(3, 1, True, 0.6))
+    warm = PhysicsWorld.from_scene(tower_scene(3, 2, True, 0.6))
     advance(warm, 0.6)
     warm_pen = warm.max_penetration() * 1000.0
     warm_speed = max(body.speed() for body in warm.bodies)

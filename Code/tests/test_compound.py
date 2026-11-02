@@ -309,11 +309,16 @@ def test_both_parts_contact() -> tuple[bool, str]:
 
 
 def test_feature_ids_unique_on_ground() -> tuple[bool, str]:
-    """组合体与地面的接触：不同部件的特征 ID 不能撞号。
+    """组合体与地面的接触：特征 ID 在部件内唯一、在部件间不撞号。
 
-    注意这里的"不撞号"是**跨部件**的，不是"每个点各有一个号"：同一部件内部
-    的多个地面接触点共用默认 ``feature_id=0``（法向相同，暖启动一个标量就够），
-    所以唯一性只需在两个部件的命名空间之间成立。
+    这条同时钉住了 ``ContactPoint.feature_id`` 契约的两层：
+
+    1. **部件内唯一**：每个地面点带自己的顶点序号（盒是 ``4*ix + 2*iy + iz``）。
+       早先"同一部件的地面点共用 ``feature_id=0``"，理由是同向冲量一个标量就够；
+       实测不成立——暖启动按此键只存一个标量，偏心负载下四角冲量相差数倍，
+       写回时互相覆盖。
+    2. **跨部件不撞号**：部件偏移 ``_PART_FEATURE_STRIDE`` 让两个部件的命名空间
+       分开，否则两个盒子部件的同名顶点会互相顶掉。
     """
     geometry = CompoundGeometry(
         [
@@ -327,16 +332,17 @@ def test_feature_ids_unique_on_ground() -> tuple[bool, str]:
         return False, "两块并排的复合体没有地面接触"
 
     feature_ids = [point.feature_id for point in contacts[0].points]
-    by_offset: dict[int, set[int]] = {}
+    by_offset: dict[int, list[int]] = {}
     for fid in feature_ids:
-        by_offset.setdefault(fid // 1_000_000, set()).add(fid)
-    # 每个部件内部共用一个 ID，且两个部件的 ID 互不相同
-    per_part_single = all(len(ids) == 1 for ids in by_offset.values())
-    distinct = len({next(iter(ids)) for ids in by_offset.values()}) == len(by_offset)
-    ok = len(feature_ids) >= 8 and len(by_offset) == 2 and per_part_single and distinct
+        by_offset.setdefault(fid // 1_000_000, []).append(fid)
+
+    per_part_unique = all(len(ids) == len(set(ids)) for ids in by_offset.values())
+    namespaces = [set(ids) for ids in by_offset.values()]
+    distinct = len(namespaces) == 2 and not (namespaces[0] & namespaces[1])
+    ok = len(feature_ids) >= 8 and len(by_offset) == 2 and per_part_unique and distinct
     return ok, (
         f"地面接触点={len(feature_ids)}，部件命名空间={sorted(by_offset)}，"
-        f"部件内共用={per_part_single}，跨部件不撞号={distinct}"
+        f"部件内唯一={per_part_unique}，跨部件不撞号={distinct}"
     )
 
 

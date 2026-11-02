@@ -318,13 +318,13 @@ def collide_box_ground(
 
     特征 ID 的约定
     --------------
-    同一物体的地面接触点**共用**默认的 ``feature_id=0``，不按顶点编号区分
-    （凸包、柱、胶囊-地面同此约定）。理由有两条：一是这几个点的法向完全相同，
-    暖启动缓存里一个标量就能表达它们各自的那份支撑冲量，按顶点拆成四个键只是
-    把同一个数抄四遍；二是顶点编号要求顶点顺序在旋转下保持稳定，这个前提一旦
-    不成立，暖启动就会把冲量喂到错误的角上。真正需要区分的是**不同物体/不同
-    部件**——那层区分由 ``collide_compound`` / ``collide_compound_ground`` 的
-    偏移负责，与本函数的每个点无关。
+    每个点用自己的**顶点序号** ``4*ix + 2*iy + iz`` 作 ``feature_id``，
+    与 ``support.feature_world_tagged`` 对盒顶点的编号同源。
+
+    这一点曾经写反过：早先四个点共用 ``feature_id=0``，理由是"这四个点法向相同，
+    一个标量就够"。实测证明不成立——偏心负载下四角累积冲量实测为
+    0.011 / 0.015 / 0.030 / 0.026（相差近 3 倍），共用一个键意味着后写入的覆盖
+    先写入的，下一帧再把这个值施给四个角：净冲量偏大、分布全错。
 
     返回
     ----
@@ -335,9 +335,9 @@ def collide_box_ground(
     half = _box_half_extents(box)
     points: list[ContactPoint] = []
 
-    for sign_x in (-1.0, 1.0):
-        for sign_y in (-1.0, 1.0):
-            for sign_z in (-1.0, 1.0):
+    for index_x, sign_x in enumerate((-1.0, 1.0)):
+        for index_y, sign_y in enumerate((-1.0, 1.0)):
+            for index_z, sign_z in enumerate((-1.0, 1.0)):
                 local = (sign_x * half[0], sign_y * half[1], sign_z * half[2])
                 world = _local_to_world(box, local)
 
@@ -350,6 +350,7 @@ def collide_box_ground(
                         position=(world[0], world[1], 0.5 * (world[2] + ground.z)),
                         normal=(0.0, 0.0, 1.0),
                         penetration=ground.z - world[2],
+                        feature_id=4 * index_x + 2 * index_y + index_z,
                     )
                 )
 
@@ -399,7 +400,7 @@ def collide_cylinder_ground(
         theta0 = 0.0   # 圆柱立得笔直：整圈等高，角度任取
 
     points: list[ContactPoint] = []
-    for cap_sign in (-1.0, 1.0):
+    for cap_index, cap_sign in enumerate((-1.0, 1.0)):
         cap_center = vec3.madd(body.position, axis, cap_sign * half_height)
         for step in range(4):
             angle = theta0 + step * 0.5 * math.pi
@@ -417,6 +418,8 @@ def collide_cylinder_ground(
                     position=(world[0], world[1], 0.5 * (world[2] + ground.z)),
                     normal=(0.0, 0.0, 1.0),
                     penetration=ground.z - world[2],
+                    # 身份 = 端面序号 × 4 + 圆周序号，与 feature_world_tagged 同源
+                    feature_id=cap_index * 4 + step,
                 )
             )
 
@@ -441,7 +444,7 @@ def collide_capsule_ground(
     axis = support_module.world_axis(body)
 
     points: list[ContactPoint] = []
-    for sign in (-1.0, 1.0):
+    for index, sign in enumerate((-1.0, 1.0)):
         endpoint = vec3.madd(body.position, axis, sign * half_height)
         lowest_z = endpoint[2] - radius
         if lowest_z >= ground.z:
@@ -451,6 +454,7 @@ def collide_capsule_ground(
                 position=(endpoint[0], endpoint[1], 0.5 * (lowest_z + ground.z)),
                 normal=(0.0, 0.0, 1.0),
                 penetration=ground.z - lowest_z,
+                feature_id=index,
             )
         )
     return points
@@ -477,7 +481,7 @@ def collide_convex_ground(body, ground: GroundPlane) -> list[ContactPoint]:
     "表面点与地面投影的中点"，与解析式的 ``ground.z + 0.5(h - r)`` 是同一个式子。
     """
     points: list[ContactPoint] = []
-    for world in support_module.feature_world(body, (0.0, 0.0, -1.0)):
+    for world, tag in support_module.feature_world_tagged(body, (0.0, 0.0, -1.0)):
         if world[2] >= ground.z:
             continue
         points.append(
@@ -485,6 +489,7 @@ def collide_convex_ground(body, ground: GroundPlane) -> list[ContactPoint]:
                 position=(world[0], world[1], 0.5 * (world[2] + ground.z)),
                 normal=(0.0, 0.0, 1.0),
                 penetration=ground.z - world[2],
+                feature_id=tag,
             )
         )
 

@@ -34,6 +34,7 @@ TEST_MODULES = [
     "test_compound",
     "test_inertia_modes",
     "test_ground_generic",
+    "test_contact_identity",
     "test_object_input",
     "test_asset",
     "test_capabilities",

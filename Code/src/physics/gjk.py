@@ -36,7 +36,7 @@ import math
 
 from ..mathutils import vec3
 from .contact import ContactPoint
-from .support import feature_world, support_world
+from .support import TAG_LIMIT, feature_world_tagged, support_world
 
 #: GJK 迭代上限。凸体问题通常 5–10 次收敛，40 次是防御性的兜底。
 _MAX_GJK_ITERATIONS = 40
@@ -711,19 +711,30 @@ def _build_manifold(body_a, body_b, normal, depth) -> list[ContactPoint]:
     每个点的深度用"该点与对面最近特征点沿法向的投影差"单独算——
     倾斜接触时边缘点并不该有中心点的深度，一律取全局深度会让物体被
     "整片吸住"，表现为不该有的刚性。
+
+    特征 ID
+    -------
+    ``feature_id = tag_a * TAG_LIMIT + tag_b``，两侧标签都来自
+    ``support.feature_world_tagged``，由**几何特征**决定（盒的顶点序号、端面圆周
+    序号、母线端点序号），与"点在列表里的第几个"无关。
+
+    为什么不能用 ``enumerate`` 的下标：这条流形接着会按深度排序再截断（见末尾的
+    ``sort`` + ``del``），而倾斜时点的个数本身也会变。下标于是每帧都在漂移，
+    暖启动会把上一帧某个角上的冲量喂到另一个角——症状是静置物体缓慢自旋，
+    且只在偏心负载下才看得出来。
     """
-    feature_a = feature_world(body_a, normal)
-    feature_b = feature_world(body_b, (-normal[0], -normal[1], -normal[2]))
+    feature_a = feature_world_tagged(body_a, normal)
+    feature_b = feature_world_tagged(body_b, (-normal[0], -normal[1], -normal[2]))
 
     if len(feature_a) > 1 and len(feature_b) > 1:
         points: list[ContactPoint] = []
-        for index, point in enumerate(feature_a):
-            nearest = min(
+        for point, tag_a in feature_a:
+            nearest, tag_b = min(
                 feature_b,
                 key=lambda other: (
-                    (point[0] - other[0]) ** 2
-                    + (point[1] - other[1]) ** 2
-                    + (point[2] - other[2]) ** 2
+                    (point[0] - other[0][0]) ** 2
+                    + (point[1] - other[0][1]) ** 2
+                    + (point[2] - other[0][2]) ** 2
                 ),
             )
             offset = vec3.sub(point, nearest)
@@ -735,7 +746,7 @@ def _build_manifold(body_a, body_b, normal, depth) -> list[ContactPoint]:
                     position=vec3.madd(point, normal, -0.5 * point_depth),
                     normal=normal,
                     penetration=point_depth,
-                    feature_id=index,
+                    feature_id=tag_a * TAG_LIMIT + tag_b,
                 )
             )
         if points:
