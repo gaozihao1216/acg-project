@@ -314,7 +314,10 @@ def _to_body_frame(body, point):
 
 
 def test_ring_tags_stay_in_body_frame() -> tuple[bool, str]:
-    """圆盘四点：同一个 tag 恒对应同一个**体坐标**槽位。
+    """端面类支撑特征：同一个 tag 恒对应同一个**体坐标**槽位。
+
+    覆盖三条入口——圆柱自己的端面分支，以及 ``_face_ring()`` 服务的圆锥底面、
+    圆台底面/顶面、球冠底面。它们共用 ``_ring_basis()``，但入口不同，逐个跑一遍。
 
     验收口径是局部坐标，不是世界坐标——物体转了，采样点本来就该跟着转：
 
@@ -325,11 +328,10 @@ def test_ring_tags_stay_in_body_frame() -> tuple[bool, str]:
     同一个 tag 的世界位置位移 **0.424 m**（盘面直径 0.6 m）。改到体坐标系后
     这个跳变消失。
 
-    这只解决了"基底跳变"，**不等于**完整的跨帧持久性：端面 / 侧面 / 单点三种
-    模式之间仍会切换，流形点数仍会变，P0-1 重建接触区域后采样点本身还会变。
-    那些要靠局部锚点 + 有效性校验（`docs/07` §4.2）。
+    这只解决了"基底跳变"，**不等于**完整跨帧持久性：端面 / 侧面 / 单点三种
+    模式之间仍会切换（``_FACE_COS_TOL`` 约 3°），流形点数仍会变，P0-1 重建
+    接触区域后采样点本身还会变。那些要靠局部锚点 + 有效性校验（`docs/07` §4.2）。
     """
-    radius = 0.3
     # 倾斜角必须留在端面模式的容差内（``_FACE_COS_TOL = 0.9986``，约 3°）：
     # 超过就会被判成侧面/单点接触，那是另一种模式，不归这条用例管。
     # 而基底跳变在 1e-6 rad 量级就会发生，所以这点角度足够暴露问题。
@@ -341,48 +343,71 @@ def test_ring_tags_stay_in_body_frame() -> tuple[bool, str]:
         ("绕 y 1e-3", _tilt((0.0, 1.0, 0.0), 1e-3)),
         ("绕 (0.6,0.8,0) 2.5e-3", _tilt((0.6, 0.8, 0.0), 2.5e-3)),
     )
+    cases = (
+        ("圆柱端面", CylinderGeometry(0.3, 1.0), (0.0, 0.0, -1.0)),
+        ("圆锥底面", ConeGeometry(0.3, 1.2), (0.0, 0.0, -1.0)),
+        ("圆台底面", FrustumGeometry(0.4, 0.15, 0.9), (0.0, 0.0, -1.0)),
+        ("圆台顶面", FrustumGeometry(0.4, 0.15, 0.9), (0.0, 0.0, 1.0)),
+        ("球冠底面", SphericalCapGeometry(0.5, 0.5), (0.0, 0.0, -1.0)),
+    )
 
-    reference: dict[int, tuple[float, float, float]] = {}
-    worst_local = 0.0
-    worst_pose = ""
-    unique_ok = True
+    failures: list[str] = []
+    report: list[str] = []
+    for label, geometry, direction in cases:
+        reference: dict[int, tuple[float, float, float]] = {}
+        worst_local = 0.0
+        worst_pose = ""
+        unique_ok = True
+        point_count = 0
 
-    for name, orientation in poses:
-        body = make_body(CylinderGeometry(radius, 1.0), 0.0, orientation)
-        tagged = feature_world_tagged(body, (0.0, 0.0, -1.0))
-        tags = [tag for _point, tag in tagged]
-        unique_ok = unique_ok and len(tags) == len(set(tags))
-        if len(tagged) != 4:
-            return False, f"{name}：期望 4 点，实际 {len(tagged)} 点"
+        for name, orientation in poses:
+            body = make_body(geometry, 0.0, orientation)
+            tagged = feature_world_tagged(body, direction)
+            point_count = len(tagged)
+            tags = [tag for _point, tag in tagged]
+            unique_ok = unique_ok and len(tags) == len(set(tags))
+            if point_count != 4:
+                failures.append(f"{label}/{name}：{point_count} 点（期望 4）")
+                break
 
-        for point, tag in tagged:
-            local = _to_body_frame(body, point)
-            if tag not in reference:
-                reference[tag] = local
-                continue
-            deviation = math.sqrt(
-                sum((local[axis] - reference[tag][axis]) ** 2 for axis in range(3))
+            for point, tag in tagged:
+                local = _to_body_frame(body, point)
+                if tag not in reference:
+                    reference[tag] = local
+                    continue
+                deviation = math.sqrt(
+                    sum((local[axis] - reference[tag][axis]) ** 2 for axis in range(3))
+                )
+                if deviation > worst_local:
+                    worst_local = deviation
+                    worst_pose = name
+
+        if point_count != 4:
+            continue
+        if not unique_ok or worst_local >= 1e-9:
+            failures.append(
+                f"{label}：唯一={unique_ok}，体坐标偏差={worst_local:.1e}（{worst_pose}）"
             )
-            if deviation > worst_local:
-                worst_local = deviation
-                worst_pose = name
+        report.append(f"{label} 4 点/偏差 {worst_local:.1e}")
 
-    # 姿态确实改变了采样点的世界位置（否则这条用例等于没转）
-    flat_body = make_body(CylinderGeometry(radius, 1.0), 0.0)
+    # 姿态确实改变了采样点的世界位置（否则这些用例等于没转）
+    flat_body = make_body(CylinderGeometry(0.3, 1.0), 0.0)
     turned_body = make_body(
-        CylinderGeometry(radius, 1.0), 0.0, _tilt((0.0, 1.0, 0.0), 1e-3)
+        CylinderGeometry(0.3, 1.0), 0.0, _tilt((0.0, 1.0, 0.0), 1e-3)
     )
     flat_zero = dict((tag, point) for point, tag in feature_world_tagged(flat_body, (0.0, 0.0, -1.0)))[0]
     turned_zero = dict((tag, point) for point, tag in feature_world_tagged(turned_body, (0.0, 0.0, -1.0)))[0]
     world_moved = math.sqrt(
         sum((flat_zero[axis] - turned_zero[axis]) ** 2 for axis in range(3))
     )
+    if world_moved <= 1e-5:
+        failures.append(f"倾斜 1e-3 rad 后世界位置没变（{world_moved:.1e} m），用例空转")
 
-    ok = unique_ok and worst_local < 1e-9 and world_moved > 1e-5
-    return ok, (
-        f"6 个姿态 × 4 点：同一 tag 的体坐标最大偏差={worst_local:.3e} m"
-        f"（最差姿态 {worst_pose or '—'}）；批内唯一={unique_ok}；"
-        f"倾斜 1e-3 rad 后 tag=0 的世界位置移动了 {world_moved:.3e} m"
+    if failures:
+        return False, "；".join(failures)
+    return True, (
+        f"{len(cases)} 种端面 × {len(poses)} 个姿态：" + "；".join(report)
+        + f"；倾斜 1e-3 rad 世界位置移动 {world_moved:.2e} m"
     )
 
 
