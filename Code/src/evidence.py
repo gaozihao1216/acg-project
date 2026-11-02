@@ -367,12 +367,29 @@ def render_warm_start() -> str:
 _EVIDENCE_SUFFIXES = (".asset.json", ".scene.json", ".engine.json", ".poses.json")
 
 
+def _normalized_size(path: Path) -> int:
+    """按 LF 归一化后的字节数。
+
+    这些 JSON 产物同时被当作"可逐字节复现"的证据，但 ``st_size`` 会随检出时的
+    换行转换而变：``core.autocrlf=true`` 的机器上 ``cloud.asset.json`` 是 5057
+    字节，LF 机器上是 4854——差值 203 正好等于行数。同一个提交在两台机器上得出
+    两个"真值"，这条证据就失效了。
+
+    文档要记的是**内容**的字节数，不是某台机器磁盘分配的字节数，所以先统一换行
+    再计数。仓库另外用 ``.gitattributes`` 让 ``*.json`` 一律以 LF 检出。
+    """
+    raw = path.read_bytes()
+    return len(raw.replace(b"\r\n", b"\n"))
+
+
 def render_artifacts() -> str:
     """``docs/13`` 的产物字节数表，**现场扫描目录**得到。
 
     字节数是最廉价、也最不容辩解的证据：文件被重跑一次而内容变了，数字就变。
     注意这里只给"多大"，不给"一致"——逐字节复现要跑 ``reproduce.py``（会重放
     仿真，较重），所以那句话留在正文，由人跑。
+
+    计数口径见 :func:`_normalized_size`：LF 归一化，避免换行转换让数字漂移。
     """
     if not CASE_ROOT.is_dir():
         raise FileNotFoundError(f"找不到案例目录 {CASE_ROOT}")
@@ -386,7 +403,7 @@ def render_artifacts() -> str:
             name = artifact.name
             if not name.endswith(_EVIDENCE_SUFFIXES) or ".expanded." in name:
                 continue
-            size = artifact.stat().st_size
+            size = _normalized_size(artifact)
             rows.append([
                 case_dir.name,
                 f"`{name}`",

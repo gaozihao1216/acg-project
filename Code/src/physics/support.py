@@ -133,7 +133,29 @@ TAG_LIMIT = 512
 def feature_world_tagged(
     body, direction, tol: float = 1e-4
 ) -> list[tuple[tuple[float, float, float], int]]:
-    """沿 ``direction`` 的**支撑特征**：一组"几乎同样远"的表面点，各带一个标签。
+    """沿 ``direction`` 的**支撑特征**，每个点带一个几何特征标签。
+
+    包装 :func:`_feature_branches` 并校验标签范围：``TAG_LIMIT`` 是
+    ``gjk._build_manifold`` 编码两侧标签时的隐含宽度。将来新增几何若产出越界
+    标签，必须在这里**立刻失败**，而不是在编码后静默撞键——那种错误只会表现为
+    "某个角偶尔复用了别处的冲量"，没有任何报错。
+    """
+    points = _feature_branches(body, direction, tol)
+    for _point, tag in points:
+        if not 0 <= tag < TAG_LIMIT:
+            raise ValueError(
+                f"支撑特征标签 {tag} 超出 [0, {TAG_LIMIT})："
+                f"{type(body.geometry).__name__} 的编码与 TAG_LIMIT 不一致"
+            )
+    return points
+
+
+def _feature_branches(
+    body, direction, tol: float = 1e-4
+) -> list[tuple[tuple[float, float, float], int]]:
+    """各几何的支撑特征分支（不校验标签，对外入口见 :func:`feature_world_tagged`）。
+
+    沿 ``direction`` 的**支撑特征**：一组"几乎同样远"的表面点，各带一个标签。
 
     为什么需要它
     ------------
@@ -158,17 +180,24 @@ def feature_world_tagged(
 
     标签（``tag``）的语义
     --------------------
-    标签在**同一个物体内唯一**，并且由几何特征本身决定，不看点在列表里的位置：
+    标签在**同一个物体内唯一**，且与"点在返回列表里的第几个"无关。这是硬要求，
+    也是它能当暖启动键的前提。但"跨帧稳定"要分两种强度，不能一概而论：
 
-    - 盒：局部顶点序号 ``4*ix + 2*iy + iz``（``ix/iy/iz`` 是该轴取正号与否）
-    - 凸包：``geometry.vertices`` 里的顶点下标
-    - 圆柱端面 / 圆锥与圆台的端面 / 球冠底面：``面序号 * 4 + 圆周序号``
-    - 圆柱与胶囊的母线端点：``_TAG_SIDE + 端点序号``
-    - 严格凸体（球、椭球）与退化端面：``0``
+    | 标签来源 | 性质 |
+    |---|---|
+    | 盒的顶点序号 ``4*ix + 2*iy + iz``、凸包的顶点下标 | **真特征**：体坐标系里固定的那个角 |
+    | 圆柱 / 胶囊的母线端点序号 | **真特征**：体坐标系里固定的那一端 |
+    | 圆盘四点（柱端面、锥/台/冠底面） | **采样槽位**：``_RING_ANGLES`` 固定的 4 个角，但圆周起点由 ``vec3.orthogonal_basis(世界轴)`` 决定 |
+    | 严格凸体（球、椭球）与退化端面的单点 | 常量 ``_TAG_SINGLE``，只表示"本帧唯一的那个点" |
 
-    这条性质是 ``ContactPoint.feature_id`` 契约的实现基础：倾斜时浅点被裁掉，
-    剩下点的标签**不变**，于是暖启动不会把冲量喂到别的角上。若这里改成"按
-    返回列表的序号编号"，裁掉一个浅点就会让后面所有点的身份整体前移。
+    圆盘那一行是**已知边界**：``orthogonal_basis`` 按"轴的最小分量"挑辅助坐标轴，
+    轴方向跨越该分界时基底不连续，同一个圆周序号可能对应跳了很远的另一个位置
+    （实测两轴夹角 2e-8 时首点切向差 114°）。批内唯一性不受影响——四点仍是四个
+    不同标签——但它**不是**完整的持久接触身份。真正的跨帧匹配要靠两侧局部锚点 +
+    有效性检查（见 `docs/07` §4.1）。
+
+    裁点那条性质仍然成立：倾斜时浅点被裁掉，剩余点的标签**不变**（是原子集的
+    子集），不会像数组下标那样整体前移。
     """
     geometry = body.geometry
 
@@ -178,7 +207,10 @@ def feature_world_tagged(
         + direction[2] * direction[2]
     )
     if defect <= _EPS:
-        return [support_world(body, direction)]
+        # 零/极短方向：没有"最凸的那一片"可枚举，退化成单个支撑点。
+        # 这里曾经漏包标签，直接返回了裸点，让 feature_world() 解包时抛
+        # ValueError；零向量在 GJK 退化情形（两体中心重合）下真的会出现。
+        return [(support_world(body, direction), _TAG_SINGLE)]
 
     if isinstance(geometry, SphereGeometry):
         return [(support_world(body, direction), 0)]

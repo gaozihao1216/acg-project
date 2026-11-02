@@ -48,6 +48,7 @@ from src.physics.narrowphase import (
     collide_cylinder_ground,
     detect_contacts,
 )
+from src.physics.support import TAG_LIMIT, feature_world, feature_world_tagged
 from src.physics.world import PhysicsWorld
 from src.scene.scene_spec import SceneSpec
 
@@ -187,11 +188,14 @@ def test_gjk_manifold_ids_unique() -> tuple[bool, str]:
 # 5. 通用流形：微小运动不改变身份
 # ---------------------------------------------------------------------------
 
-def test_gjk_ids_stable_under_small_motion() -> tuple[bool, str]:
-    """柱体绕自身轴微小转动后，同一个接触角应保持同一个 ID。
+def test_gjk_ids_stable_under_axis_spin() -> tuple[bool, str]:
+    """柱体绕**自身轴**自转后，接触点的 ID 与位置配对一致。
 
-    判据不看 ID 序列（顺序会随深度排序变），而是**按位置配对**：对每个点在
-    另一帧里找最近的点，比较两者的 ID。序号编号会在这里成片错位。
+    这条只证明一个具体情形：轴在世界空间不动，于是圆周采样基也不动，采样槽位
+    随体一起转，标签自然跟上。
+
+    它**不**证明倾斜稳定，更不证明跨越基底分界时稳定——那两件当前做不到，
+    见第 8 项与 ``contact.py`` 里"跨帧稳定 = best effort"的措辞。
     """
     base = make_body(CylinderGeometry(0.3, 0.8), 0.45)
     box = RigidBody(
@@ -231,7 +235,101 @@ def test_gjk_ids_stable_under_small_motion() -> tuple[bool, str]:
 
 
 # ---------------------------------------------------------------------------
-# 6-7. 偏心堆叠：缓存按点分开存
+# 6. 接口边界：零方向与标签范围
+# ---------------------------------------------------------------------------
+
+def test_zero_direction_returns_tagged() -> tuple[bool, str]:
+    """零方向必须返回 ``[(point, tag)]``，而不是裸点。
+
+    这里曾经漏包标签：``feature_world_tagged`` 的零方向分支直接返回
+    ``[support_world(...)]``，于是 ``feature_world()`` 解包时抛
+    ``ValueError: too many values to unpack``。零向量在 GJK 的退化情形
+    （两体中心重合、法向退化为零）下真的会出现，属于会崩的路径。
+    """
+    body = make_body(CylinderGeometry(0.3, 1.0), 0.0)
+    tagged = feature_world_tagged(body, (0.0, 0.0, 0.0))
+    shape_ok = len(tagged) == 1 and len(tagged[0]) == 2
+    plain = feature_world(body, (0.0, 0.0, 0.0))   # 薄包装：当初就是这里崩的
+    ok = shape_ok and len(plain) == 1 and len(plain[0]) == 3
+    return ok, f"零方向 → {tagged}；feature_world → {len(plain)} 个裸点"
+
+
+def test_all_tags_within_limit() -> tuple[bool, str]:
+    """所有几何、所有方向下，标签都必须落在 ``[0, TAG_LIMIT)``。
+
+    ``TAG_LIMIT`` 是 ``gjk`` 编码 ``tag_a * TAG_LIMIT + tag_b`` 的隐含宽度。
+    编码本身不做检查，越界只能由 ``feature_world_tagged`` 的校验兜住；
+    这条用例保证校验确实在跑，且现有几何都用得下 512 的宽度。
+    """
+    directions = (
+        (0.0, 0.0, -1.0),
+        (1.0, 0.0, 0.0),
+        (0.31, 0.22, -0.92),
+        (0.0, 0.0, 0.0),
+    )
+    geometries = (
+        ("盒", BoxGeometry((0.6, 0.6, 0.6))),
+        ("柱", CylinderGeometry(0.3, 1.0)),
+        ("胶囊", CapsuleGeometry(0.2, 0.6)),
+        ("圆锥", ConeGeometry(0.3, 1.2)),
+        ("圆台", FrustumGeometry(0.4, 0.15, 0.9)),
+        ("球冠", SphericalCapGeometry(0.5, 0.5)),
+        ("椭球", EllipsoidGeometry((0.5, 0.4, 0.3))),
+        ("球", SphereGeometry(0.3)),
+    )
+    highest = -1
+    for label, geometry in geometries:
+        body = make_body(geometry, 0.0)
+        for direction in directions:
+            for _point, tag in feature_world_tagged(body, direction):
+                if not 0 <= tag < TAG_LIMIT:
+                    return False, f"{label} 在方向 {direction} 上给出越界标签 {tag}"
+                highest = max(highest, tag)
+    return True, (
+        f"{len(geometries)} 种几何 × {len(directions)} 个方向，"
+        f"最大标签={highest}（上限 {TAG_LIMIT}）"
+    )
+
+
+# ---------------------------------------------------------------------------
+# 7. 已知边界：圆盘标签是"采样槽位"
+# ---------------------------------------------------------------------------
+
+def test_ring_tags_are_slots_not_features() -> tuple[bool, str]:
+    """圆盘四点的标签是采样槽位，不是稳定的几何特征（钉住当前边界）。
+
+    圆周起点由 ``vec3.orthogonal_basis(世界轴)`` 决定，它按"轴的最小分量"挑
+    辅助坐标轴；轴方向跨越该分界时基底不连续。实测：竖直圆柱绕 y 轴倾斜
+    ``1e-6`` rad，tag=0 的点从 (+x, +y) 跳到 (+x, −y)，位移接近盘面直径。
+
+    这条用例是**故意断言"会跳"**的：它记录当前实现的边界，不是期望行为。
+    将来把采样基改到体坐标系（正确的修法）之后本用例会失败——那时应把它改成
+    "不跳"，并同步 ``contact.py`` 的措辞与 `docs/07` §4.1。
+    """
+    radius = 0.3
+    base = make_body(CylinderGeometry(radius, 1.0), 0.0)
+    tilt = 1e-6
+    turned = make_body(
+        CylinderGeometry(radius, 1.0),
+        0.0,
+        (math.cos(0.5 * tilt), 0.0, math.sin(0.5 * tilt), 0.0),
+    )
+    before = {tag: point for point, tag in feature_world_tagged(base, (0.0, 0.0, -1.0))}
+    after = {tag: point for point, tag in feature_world_tagged(turned, (0.0, 0.0, -1.0))}
+    if 0 not in before or 0 not in after:
+        return False, "圆盘采样没有 tag=0 的点，无法比较"
+
+    jump = math.sqrt(sum((before[0][axis] - after[0][axis]) ** 2 for axis in range(3)))
+    unique_after = len(set(after)) == len(after)
+    ok = jump > 0.1 and unique_after
+    return ok, (
+        f"倾斜 {tilt:.0e} rad 后 tag=0 位移={jump:.4f} m"
+        f"（盘面直径 {2 * radius:.2f} m）；批内仍唯一={unique_after}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# 8-9. 偏心堆叠：缓存按点分开存
 # ---------------------------------------------------------------------------
 
 def _offcenter_stack() -> PhysicsWorld:
@@ -322,9 +420,12 @@ CHECKS = [
     ("2. 地面 ID 与几何特征对应", test_ground_ids_match_features),
     ("3. 倾斜裁点不改变剩余点身份", test_ids_survive_point_pruning),
     ("4. GJK 流形 ID 唯一", test_gjk_manifold_ids_unique),
-    ("5. GJK 流形 ID 微小运动下稳定", test_gjk_ids_stable_under_small_motion),
-    ("6. 偏心负载：缓存键数 = 接触点数", test_cache_keys_per_contact_point),
-    ("7. 偏心负载：四点冲量分别存储", test_impulses_stored_separately),
+    ("5. 绕自身轴自转时 ID 与位置配对一致", test_gjk_ids_stable_under_axis_spin),
+    ("6. 零方向返回带标签", test_zero_direction_returns_tagged),
+    ("7. 所有标签都在 TAG_LIMIT 内", test_all_tags_within_limit),
+    ("8. 圆盘标签是采样槽位（已知边界）", test_ring_tags_are_slots_not_features),
+    ("9. 偏心负载：缓存键数 = 接触点数", test_cache_keys_per_contact_point),
+    ("10. 偏心负载：四点冲量分别存储", test_impulses_stored_separately),
 ]
 
 

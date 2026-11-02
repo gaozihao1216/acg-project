@@ -1,0 +1,9 @@
+# 证据链里的 JSON 产物要能逐字节比对（`docs/13` 记录字节数，`reproduce.py` 逐字节校验）。
+#
+# 不锁换行的话，同一个提交在不同机器上检出后的字节数会不同：
+# `core.autocrlf=true` 把 LF 变成 CRLF，`cloud.asset.json` 从 4854 涨到 5057，
+# 差值正好等于行数。于是文档里的"真值"只对某台机器成立。
+*.json text eol=lf
+
+# Windows 批处理按 CRLF 存档
+*.bat text eol=crlf
