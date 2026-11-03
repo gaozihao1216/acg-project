@@ -26,6 +26,7 @@
 from __future__ import annotations
 
 import math
+from dataclasses import dataclass
 
 from ..geom.geometry import (
     BoxGeometry,
@@ -38,6 +39,7 @@ from ..geom.geometry import (
     SphereGeometry,
     SphericalCapGeometry,
 )
+from ..mathutils import poly2d
 from ..mathutils import quaternion as quat
 from ..mathutils import vec3
 
@@ -65,23 +67,52 @@ def _ring_angles(segments: int):
     return tuple(math.pi * 0.25 + index * step for index in range(segments))
 
 
-#: 把圆盘离散成内接正多边形时容许的**内缩**（米）。求交需要一个有边界的多边形，
-#: 边数按这个误差自适应：``N ≥ π / arccos(1 − ε/r)``。
+#: 把圆盘离散成内接正多边形时容许的**内缩**（米），即 :func:`support_patch_world`
+#: 的默认目标误差。边数按它反解：``N ≥ π / arccos(1 − ε/r)``。
 #:
 #: 0.5 mm 比 2 mm 的 slop 更小，窄搭接时不会因为"多边形比圆盘小一圈"而假性不相交。
 _PATCH_MESH_ERROR = 5e-4
 
-#: 自适应边数的上限，防止半径很小时算出几千个点。
-_PATCH_MAX_SEGMENTS = 128
+#: 自适应边数的上限。**这个上限会打破误差承诺**：半径超过约 6.6 m 时，要满足
+#: 0.5 mm 内缩需要更多边，实际内缩就会大于 :data:`_PATCH_MESH_ERROR`
+#: （实际值用 :func:`_ring_inradius_error` 核对）。取 256 是因为场景里最大的
+#: 圆盘半径约 3 m，那个尺寸只需 173 边；再往上加，求交的 O(N·M) 代价涨得比
+#: 收益快。早先这里的注释把方向写反了：边数随半径**增大**而增加。
+_PATCH_MAX_SEGMENTS = 256
 
 
-def _segments_for_radius(radius: float) -> int:
-    """按内缩误差反解圆盘的离散边数。"""
+def _segments_for_radius(radius: float, mesh_error: float) -> int:
+    """按**给定**内缩误差反解圆盘的离散边数。
+
+    ``mesh_error`` 是实参而不是读模块常量：早先它写死在函数体里，传 1e-4 还是
+    1e-3 结果完全一样，参数实际退化成了"要不要自适应"的布尔开关。
+
+    返回值是**目标误差**下的边数；触到 :data:`_PATCH_MAX_SEGMENTS` 时实际内缩会
+    超标，用 :func:`_ring_inradius_error` 核对，不要假定它一定达标。
+    """
+    if not mesh_error > 0.0:
+        # NaN 也会走到这里：比较为假时一律拒绝
+        raise ValueError(f"mesh_error 必须为正数，收到：{mesh_error!r}")
+    if radius < 0.0:
+        # 负半径没有几何意义；构造器已经拦了，这里拦住绕过构造器的调用
+        raise ValueError(f"radius 不能为负，收到：{radius!r}")
     if radius <= _EPS:
-        return 4
-    ratio = max(-1.0, min(1.0, 1.0 - _PATCH_MESH_ERROR / radius))
+        # 半径为 0 的退化端面：三角形就够表达"一个点"
+        return 3
+    ratio = max(-1.0, min(1.0, 1.0 - mesh_error / radius))
     count = math.ceil(math.pi / math.acos(ratio))
-    return max(4, min(_PATCH_MAX_SEGMENTS, count))
+    return max(3, min(_PATCH_MAX_SEGMENTS, count))
+
+
+def _ring_inradius_error(radius: float, count: int) -> float:
+    """内接正 ``count`` 边形相对圆盘的**实际内缩**（正矢）``r·(1 − cos(π/N))``。
+
+    把"目标误差"和"实际误差"分成两个可测量，边数是否够用就能被测试钉住，
+    而不是靠注释里的承诺——触到边数上限时承诺本就不成立。
+    """
+    if radius <= _EPS or count < 3:
+        return 0.0
+    return radius * (1.0 - math.cos(math.pi / count))
 
 #: 回转体"母线端点"类标签的起点。端面环占用 0..7，这里错开。
 _TAG_SIDE = 8
@@ -169,23 +200,142 @@ def feature_world_tagged(
     return points
 
 
+#: 支撑 patch 的退化类别。求交按类别分派，不看点数——"两个点"既可能是线段，
+#: 也可能是重合的重复点，靠点数猜会在退化情形下猜错。
+PATCH_POINT = "point"
+PATCH_SEGMENT = "segment"
+PATCH_POLYGON = "polygon"
+
+
+@dataclass
+class SupportPatch:
+    """沿某方向的**支撑几何**：只有形状，没有身份。
+
+    与 :func:`feature_world_tagged` 的差别不是"点多点少"，而是**有没有身份**：
+    暖启动要一个跨帧稳定的 ``feature_id``，那只有固定槽位的 4 点采样才有；
+    切平面求交只关心几何，采样越密越好，点位与帧号无关。两者共用同一个返回类型
+    时，防止误用的唯一手段是一句 docstring，而高密度标签还会与 ``_TAG_SIDE`` /
+    ``_TAG_SINGLE`` 撞号——所以这里单独一个类型，它**没有** ``tag`` 字段。
+
+    属性
+    ----
+    vertices : list[tuple[float, float, float]]
+        世界坐标点列：``PATCH_POINT`` 1 个、``PATCH_SEGMENT`` 2 个、
+        ``PATCH_POLYGON`` 至少 3 个且共面，按切平面上的角度序排列（凸包序）。
+    kind : str
+        ``PATCH_POINT`` / ``PATCH_SEGMENT`` / ``PATCH_POLYGON``。
+    normal : tuple[float, float, float]
+        支撑面的外法向（世界系、单位向量）；方向退化时是零向量。
+    """
+
+    vertices: list
+    kind: str
+    normal: tuple
+
+
+def support_patch_world(
+    body, direction, mesh_error: float = _PATCH_MESH_ERROR
+) -> SupportPatch:
+    """沿 ``direction`` 的支撑几何（世界坐标），供切平面求交使用。
+
+    与 :func:`feature_world_tagged` 同源、不同用途：
+
+    - 圆盘面按 ``mesh_error`` 由 :func:`_segments_for_radius` 反解边数（可达
+      256 边），而不是固定 4 点——内接四边形比圆盘小 29%，窄搭接时会被算成
+      "不相交"；
+    - 返回 :class:`SupportPatch`，不带标签，不给暖启动留误用的余地。
+
+    求交本身不在这里（见 ``docs/07`` 的 P0-1 计划）：本函数只回答"沿这个方向，
+    哪一片几何是支撑集"。
+    """
+    geometry = body.geometry
+    defect = math.sqrt(
+        direction[0] * direction[0]
+        + direction[1] * direction[1]
+        + direction[2] * direction[2]
+    )
+    if defect <= _EPS:
+        # 没有方向就没有法向，也没有"最凸的一片"：退回单点，法向留零向量
+        return SupportPatch([support_world(body, direction)], PATCH_POINT, (0.0, 0.0, 0.0))
+
+    unit = (direction[0] / defect, direction[1] / defect, direction[2] / defect)
+
+    if isinstance(geometry, (SphereGeometry, EllipsoidGeometry)):
+        # 严格凸：任意方向只有一个支撑点
+        return SupportPatch([support_world(body, direction)], PATCH_POINT, unit)
+
+    if isinstance(geometry, (BoxGeometry, ConvexHullGeometry)):
+        return _patch_from_points(
+            [point for point, _tag in _feature_branches(body, direction)], unit
+        )
+
+    axis = world_axis(body)
+    cos_axis = unit[0] * axis[0] + unit[1] * axis[1] + unit[2] * axis[2]
+
+    face = _cap_face(geometry, cos_axis)
+    if face is not None:
+        z_local, radius, sign = face
+        count = _segments_for_radius(radius, mesh_error)
+        vertices = _ring_points(body, z_local, radius, count)
+        normal = axis if sign > 0.0 else (-axis[0], -axis[1], -axis[2])
+        return SupportPatch(
+            vertices, PATCH_POLYGON if len(vertices) >= 3 else PATCH_POINT, normal
+        )
+
+    if (isinstance(geometry, (CylinderGeometry, CapsuleGeometry))
+            and abs(cos_axis) <= _SIDE_COS_TOL):
+        # 侧面接触：两条母线的端点，是**一条线段**
+        radial = _radial_direction(direction, axis)
+        half_height = 0.5 * geometry.height
+        vertices = [
+            vec3.madd(
+                vec3.madd(body.position, axis, sign * half_height), radial, geometry.radius
+            )
+            for sign in (-1.0, 1.0)
+        ]
+        return SupportPatch(vertices, PATCH_SEGMENT, radial)
+
+    # 斜撑的锥/台/冠、倾斜圆柱的端面边缘：支撑集只是一个点
+    return SupportPatch([support_world(body, direction)], PATCH_POINT, unit)
+
+
+def _patch_from_points(points, normal) -> SupportPatch:
+    """顶点集合 → :class:`SupportPatch`：按数量定类别，多边形先按切平面凸包重排。
+
+    盒/凸包的顶点按 ``4*ix + 2*iy + iz`` 枚举，那是"角标顺序"，不是环序。求交
+    需要环序（否则多边形的边会被连成对角线），所以这里投影到切平面、跑一次
+    凸包拿回下标序列，再按序列取出三维点。顺带的收益是共线的中间点自动消失。
+    """
+    if len(points) <= 1:
+        return SupportPatch(list(points), PATCH_POINT, normal)
+    if len(points) == 2:
+        return SupportPatch(list(points), PATCH_SEGMENT, normal)
+
+    u, v = poly2d.tangent_basis(normal)
+    flat = poly2d.project(points, u, v, _centroid(points))
+    order = poly2d.convex_hull_2d(flat)
+    return SupportPatch([points[index] for index in order], PATCH_POLYGON, normal)
+
+
+def _centroid(points) -> tuple[float, float, float]:
+    """点列的平均位置，用作切平面投影原点。"""
+    count = len(points)
+    return (
+        sum(point[0] for point in points) / count,
+        sum(point[1] for point in points) / count,
+        sum(point[2] for point in points) / count,
+    )
+
+
 def _feature_branches(
-    body,
-    direction,
-    tol: float = 1e-4,
-    segments: int = 4,
-    mesh_error: float | None = None,
+    body, direction, tol: float = 1e-4
 ) -> list[tuple[tuple[float, float, float], int]]:
     """各几何的支撑特征分支（不校验标签，对外入口见 :func:`feature_world_tagged`）。
 
-    ``segments`` / ``mesh_error`` 只影响**圆盘**的离散粒度：
-
-    - ``feature_world_tagged`` 固定用 4 段（标签槽位，流形 ID 依赖它）；
-    - ``support_patch_world`` 传 ``mesh_error``，由 :func:`_segments_for_radius`
-      按半径反解边数，用于切平面求交。
-
-    非圆盘分支（球、盒、凸包、母线端点）忽略这两个参数。
-
+    这里只做**身份采样**：圆盘固定 4 点，标签是固定槽位，供暖启动跨帧匹配。
+    需要高密度几何（切平面求交）的调用方走 :func:`support_patch_world`，它返回
+    不带标签的 :class:`SupportPatch`——两条路径在**类型上**分开，而不是靠一句
+    "这批标签别拿去匹配"的注释。
 
     沿 ``direction`` 的**支撑特征**：一组"几乎同样远"的表面点，各带一个标签。
 
@@ -219,7 +369,7 @@ def _feature_branches(
     |---|---|
     | 盒的顶点序号 ``4*ix + 2*iy + iz``、凸包的顶点下标 | **真特征**：体坐标系里固定的那个角 |
     | 圆柱 / 胶囊的母线端点序号 | **真特征**：体坐标系里固定的那一端 |
-    | 圆盘四点（柱端面、锥/台/冠底面） | **体坐标槽位**：``_ring_angles(count)`` 固定的 ``count`` 个角，圆周起点由 :func:`_ring_basis` 固定在体坐标系 |
+    | 圆盘四点（柱端面、锥/台/冠底面） | **体坐标槽位**：``_ring_angles(4)`` 固定的 4 个角，圆周起点由 :func:`_ring_basis` 固定在体坐标系 |
     | 严格凸体（球、椭球）与退化端面的单点 | 常量 ``_TAG_SINGLE``，只表示"本帧唯一的那个点" |
 
     圆盘这一行**曾经是**已知边界：圆周起点取自 ``vec3.orthogonal_basis(世界轴)``，
@@ -305,46 +455,25 @@ def _feature_branches(
         direction[0] * axis[0] + direction[1] * axis[1] + direction[2] * axis[2]
     ) / defect
 
-    if isinstance(geometry, CylinderGeometry):
-        radius = geometry.radius
-        half_height = 0.5 * geometry.height
-        if abs(cos_axis) >= _FACE_COS_TOL:
+    if isinstance(geometry, (CylinderGeometry, CapsuleGeometry)):
+        face = _cap_face(geometry, cos_axis)   # 胶囊没有平面端面，恒为 None
+        if face is not None:
             # 端面接触：圆周上等角取 4 点，足以撑住"平放不翻"
-            cap = 1 if cos_axis > 0.0 else 0
-            center = vec3.madd(
-                body.position, axis, half_height if cos_axis > 0.0 else -half_height
-            )
-            e1, e2 = _ring_basis(body)
-            count = _segments_for_radius(radius) if mesh_error is not None else segments
-            return [
-                (vec3.add(center, _ring_offset(e1, e2, angle, radius)), cap * count + step)
-                for step, angle in enumerate(_ring_angles(count))
-            ]
+            z_local, radius, sign = face
+            return _face_ring_tagged(body, z_local, radius, 0 if sign < 0.0 else 4)
         if abs(cos_axis) <= _SIDE_COS_TOL:
             # 侧面接触：两条母线的端点
             radial = _radial_direction(direction, axis)
+            half_height = 0.5 * geometry.height
+            base_tag = _TAG_SIDE if isinstance(geometry, CylinderGeometry) else 0
             return [
                 (
                     vec3.madd(
-                        vec3.madd(body.position, axis, sign * half_height), radial, radius
+                        vec3.madd(body.position, axis, sign * half_height),
+                        radial,
+                        geometry.radius,
                     ),
-                    _TAG_SIDE + index,
-                )
-                for index, sign in enumerate((-1.0, 1.0))
-            ]
-        return [(support_world(body, direction), _TAG_SINGLE)]
-
-    if isinstance(geometry, CapsuleGeometry):
-        radius = geometry.radius
-        half_height = 0.5 * geometry.height
-        if abs(cos_axis) <= _SIDE_COS_TOL:
-            radial = _radial_direction(direction, axis)
-            return [
-                (
-                    vec3.madd(
-                        vec3.madd(body.position, axis, sign * half_height), radial, radius
-                    ),
-                    index,
+                    base_tag + index,
                 )
                 for index, sign in enumerate((-1.0, 1.0))
             ]
@@ -355,35 +484,23 @@ def _feature_branches(
         return [(support_world(body, direction), 0)]
 
     if isinstance(geometry, ConeGeometry):
-        if cos_axis <= -_FACE_COS_TOL:
+        face = _cap_face(geometry, cos_axis)
+        if face is not None:
             # 底面正对方向：整个底面圆盘等深，圆周取 4 点才撑得住"平放不翻"
-            radius = geometry.radius
-            count = _segments_for_radius(radius) if mesh_error is not None else segments
-            return _face_ring(body, geometry._base_z, radius, 0, count)
+            z_local, radius, sign = face
+            return _face_ring_tagged(body, z_local, radius, 0 if sign < 0.0 else 4)
         # 其余方向（含顶点朝下）只有一个支撑点：圆锥是"圆盘 + 顶点"的凸包，
         # 支撑集要么是整块底面，要么是单点，不会出现线段
         return [(support_world(body, direction), _TAG_SINGLE)]
 
-    if isinstance(geometry, FrustumGeometry):
-        if cos_axis <= -_FACE_COS_TOL:
-            radius = geometry.bottom_radius
-            count = _segments_for_radius(radius) if mesh_error is not None else segments
-            return _face_ring(body, geometry._bottom_z, radius, 0, count)
-        if cos_axis >= _FACE_COS_TOL:
-            radius = geometry.top_radius
-            count = _segments_for_radius(radius) if mesh_error is not None else segments
-            # 顶面槽位从 count 起，免得与底面的 0..count-1 撞号
-            return _face_ring(body, geometry._top_z, radius, count, count)
+    if isinstance(geometry, (FrustumGeometry, SphericalCapGeometry)):
+        face = _cap_face(geometry, cos_axis)
+        if face is not None:
+            # 圆台底面 0..3、顶面 4..7；球冠只有底面
+            z_local, radius, sign = face
+            return _face_ring_tagged(body, z_local, radius, 0 if sign < 0.0 else 4)
         # 斜着支撑时最大值落在某条端面圆周上，是**一个**点（圆台侧面是直纹面，
         # 但只有沿母线方向才会退化成线段，而那条线段的深度并不相同）
-        return [(support_world(body, direction), _TAG_SINGLE)]
-
-    if isinstance(geometry, SphericalCapGeometry):
-        if cos_axis <= -_FACE_COS_TOL:
-            # 平底正对方向：底面圆盘就是接触面
-            radius = geometry._rim_radius
-            count = _segments_for_radius(radius) if mesh_error is not None else segments
-            return _face_ring(body, geometry._base_z, radius, 0, count)
         return [(support_world(body, direction), _TAG_SINGLE)]
 
     raise TypeError(f"不支持支撑特征采样的几何类型：{type(geometry).__name__}")
@@ -409,45 +526,82 @@ def _ring_basis(body):
     )
 
 
-def _face_ring(
-    body, center_local_z: float, radius: float, base_tag: int, count: int = 4
-):
-    """端面接触：把该端面的圆周等角取 ``count`` 点（世界坐标），标签 ``base_tag + 序号``。
+def _cap_face(geometry, cos_axis):
+    """方向正对某个**平面端面**时返回 ``(局部 z, 半径, 法向符号)``，否则 ``None``。
 
-    ``count`` 有两个用途，对应两条互不干扰的入口：
+    把"哪个端面朝这个方向"收敛到一处：身份采样（4 点）与几何 patch（高密度）
+    都从这里取端面，就不会出现两条路径对端面的判断不一致这种错误。
 
-    - ``feature_world_tagged`` 固定 ``count=4``：端面是个圆盘，理论上无穷多点等深，
-      4 个等分点足以让法向约束张成整个平面，物体不会绕单点翻转；倾斜时其余点
-      深度更浅，会被逐点裁剪掉，自然退化成 1–2 点接触。此时标签只占 ``0..7``
-      （底面 ``base_tag=0``、顶面 ``base_tag=count``），与 ``_TAG_SIDE`` /
-      ``_TAG_SINGLE`` 不重叠。
-    - ``support_patch_world`` 传 ``mesh_error``，由 :func:`_segments_for_radius`
-      按半径反解出 ``count``（最多 :data:`_PATCH_MAX_SEGMENTS`），让内接多边形
-      与圆盘的内缩不超过 :data:`_PATCH_MESH_ERROR`。这条路径只用点的**位置**，
-      标签只是"第几个采样点"的顺序号，不参与暖启动匹配——所以 ``count`` 变大后
-      标签会越过 ``_TAG_SIDE`` 也不会撞出问题；上限 128 保证 ``2*count < TAG_LIMIT``。
+    符号 ``+1`` 表示端面朝局部 +Z（世界外法向 = 轴），``-1`` 表示朝 -Z。
+    胶囊与椭球没有平面端面，恒返回 ``None``。
+    """
+    if isinstance(geometry, CylinderGeometry):
+        if cos_axis >= _FACE_COS_TOL:
+            return (0.5 * geometry.height, geometry.radius, 1.0)
+        if cos_axis <= -_FACE_COS_TOL:
+            return (-0.5 * geometry.height, geometry.radius, -1.0)
+        return None
+    if isinstance(geometry, ConeGeometry):
+        # 顶点不是平面：圆锥只有底面
+        if cos_axis <= -_FACE_COS_TOL:
+            return (geometry._base_z, geometry.radius, -1.0)
+        return None
+    if isinstance(geometry, FrustumGeometry):
+        if cos_axis >= _FACE_COS_TOL:
+            return (geometry._top_z, geometry.top_radius, 1.0)
+        if cos_axis <= -_FACE_COS_TOL:
+            return (geometry._bottom_z, geometry.bottom_radius, -1.0)
+        return None
+    if isinstance(geometry, SphericalCapGeometry):
+        # 球冠开口朝 +Z，平面只有底面
+        if cos_axis <= -_FACE_COS_TOL:
+            return (geometry._base_z, geometry._rim_radius, -1.0)
+        return None
+    return None
+
+
+def _ring_points(body, center_local_z: float, radius: float, count: int):
+    """端面圆周上 ``count`` 个等角点（世界坐标），**不带任何身份**。
 
     角度从 45° 起步等分：避开 0°，免得"立得笔直的柱"在 x/y 轴上留下与坐标轴
     方向重合的接触点——那种对齐会让求解器的摩擦约束出现方向退化。``count=4``
     时正好是 45°/135°/225°/315°，与改造前逐位相同。
 
+    圆周起点由 :func:`_ring_basis` 固定在体坐标系，于是同一个角度序号恒对应同一个
+    体坐标槽位；但这里的序号只是"第几个点"，要当身份用必须走
+    :func:`_face_ring_tagged`（它固定 4 点，槽位才配得上暖启动的键）。
+    """
+    if radius <= _EPS:
+        # 退化端面（圆锥的顶点、圆台的 0 半径端）：没有圆周可取
+        return [_local_to_world(body, (0.0, 0.0, center_local_z))]
+
+    center = _local_to_world(body, (0.0, 0.0, center_local_z))
+    e1, e2 = _ring_basis(body)
+    return [
+        vec3.add(center, _ring_offset(e1, e2, angle, radius))
+        for angle in _ring_angles(count)
+    ]
+
+
+def _face_ring_tagged(body, center_local_z: float, radius: float, base_tag: int):
+    """身份路径：端面圆周固定 4 点，各带标签 ``base_tag + 角度序号``。
+
+    端面是个圆盘，理论上无穷多点等深；4 个等分点足以让法向约束张成整个平面，
+    物体不会绕单点翻转，倾斜时其余点深度更浅、会被逐点裁剪掉，自然退化成
+    1–2 点接触。底面 ``base_tag=0``、顶面 ``base_tag=4``，环共占 ``0..7``，
+    与 ``_TAG_SIDE`` / ``_TAG_SINGLE`` 不重叠。
+
     标签用**固定的角度序号**而不是"当前列表里的第几个"：倾斜裁掉一个浅点后，
-    剩下三个点的标签仍是它们原来那三个，暖启动不会串位。圆周起点由
-    :func:`_ring_basis` 固定在体坐标系，于是同一个标签也恒对应同一个体坐标槽位。
+    剩下三个点的标签仍是它们原来那三个，暖启动不会串位。
 
     注意：``narrowphase.collide_cylinder_ground`` **不用**这里——它按世界系求
     倾斜圆柱的真实最低点（``theta0``），那个最优性不能用固定槽位替代。
     """
     if radius <= _EPS:
-        # 退化端面（圆锥的顶点、圆台的 0 半径端）：没有圆周可取
-        center = _local_to_world(body, (0.0, 0.0, center_local_z))
-        return [(center, _TAG_SINGLE)]
-
-    center = _local_to_world(body, (0.0, 0.0, center_local_z))
-    e1, e2 = _ring_basis(body)
+        return [(_local_to_world(body, (0.0, 0.0, center_local_z)), _TAG_SINGLE)]
     return [
-        (vec3.add(center, _ring_offset(e1, e2, angle, radius)), base_tag + step)
-        for step, angle in enumerate(_ring_angles(count))
+        (point, base_tag + step)
+        for step, point in enumerate(_ring_points(body, center_local_z, radius, 4))
     ]
 
 

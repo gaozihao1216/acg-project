@@ -26,6 +26,9 @@ import math
 
 Point2 = tuple[float, float]
 
+#: 当作"零"的长度阈值。法向、边向量小于它就不该再拿去向量积。
+_NORMAL_EPS = 1e-12
+
 
 def canonical_normal(normal):
     """把 ``n`` 与 ``-n`` 规范到同一个方向（绝对值最大的分量为正）。"""
@@ -42,8 +45,22 @@ def canonical_normal(normal):
 
 
 def tangent_basis(normal):
-    """接触平面的两个切向 ``(u, v)``，对 ``n`` 与 ``-n`` 稳定一致。"""
+    """接触平面的两个切向 ``(u, v)``，对 ``n`` 与 ``-n`` 稳定一致。
+
+    入口先把法向**归一化**：``v = n × u`` 只有在 ``|n| = 1`` 且 ``u ⊥ n`` 时才是
+    单位向量。传进来一个未归一化的法向（GJK 的搜索方向、EPA 的原始面法向都可能
+    带着长度）过去会得到 ``|v| = |n|``，投影到切平面时 y 方向被整体拉伸——那种
+    错误不会报错，只会让交集看起来"怪异地扁"。
+
+    零法向没有切平面可言，直接拒绝而不是除以零：调用方此时应该先检查接触是否
+    成立，而不是来求切向基。
+    """
     nx, ny, nz = canonical_normal(normal)
+    length = math.sqrt(nx * nx + ny * ny + nz * nz)
+    if length <= _NORMAL_EPS:
+        raise ValueError(f"tangent_basis 需要非零法向，收到：{normal!r}")
+    nx, ny, nz = nx / length, ny / length, nz / length
+
     ax, ay, az = abs(nx), abs(ny), abs(nz)
     if ax <= ay and ax <= az:
         helper = (1.0, 0.0, 0.0)
@@ -57,10 +74,13 @@ def tangent_basis(normal):
     uz = nx * helper[1] - ny * helper[0]
     length = math.sqrt(ux * ux + uy * uy + uz * uz)
     u = (ux / length, uy / length, uz / length)
+    # 注意用**归一化后**的 u 做叉积：|n × u| = |n||u|sin∠ = 1 只在 u 是单位
+    # 向量时成立。早先这里用的是未归一化的 ux/uy/uz，于是 |v| = |n × helper|，
+    # 法向越"斜"（helper 轴与 n 越不垂直）错得越多——(1,2,3) 时 |v| = 0.964。
     v = (
-        ny * uz - nz * uy,
-        nz * ux - nx * uz,
-        nx * uy - ny * ux,
+        ny * u[2] - nz * u[1],
+        nz * u[0] - nx * u[2],
+        nx * u[1] - ny * u[0],
     )
     return u, v
 
@@ -79,23 +99,33 @@ def cross2(origin: Point2, a: Point2, b: Point2) -> float:
     return (a[0] - origin[0]) * (b[1] - origin[1]) - (a[1] - origin[1]) * (b[0] - origin[0])
 
 
+def _same_point(a: Point2, b: Point2, eps: float = 1e-12) -> bool:
+    """两点在 ``eps`` 内重合（逐分量比较，不做开方）。"""
+    return abs(a[0] - b[0]) <= eps and abs(a[1] - b[1]) <= eps
+
+
 def convex_hull_2d(points: list[Point2], eps: float = 1e-12) -> list[int]:
     """Andrew monotone chain，返回**下标**（逆时针、去重、去共线）。
 
     返回下标而不是点：调用方要保留"这个 2D 点原本是哪个 3D 顶点 / 哪个标签"，
     索引是最省事且不失精度的做法。
-    """
-    if len(points) <= 2:
-        return list(range(len(points)))
 
-    order = sorted(range(len(points)), key=lambda i: (points[i][0], points[i][1]))
+    去重对**所有**输入规模都生效（早先 ``len(points) <= 2`` 直接原样返回，于是
+    两个重合的点会给出 ``[0, 1]``——一个零面积的"线段"）。退化情形逐条明确：
+
+    - 空输入 → ``[]``
+    - 全部重合 → 一个下标（只保留排序后的第一个）
+    - 一条线段（含共线多点）→ 两个端点下标
+    - 其余 → 逆时针凸包，不含共线的中间点
+    """
+    if not points:
+        return []
+
+    order = sorted(range(len(points)), key=lambda index: (points[index][0], points[index][1]))
     unique: list[int] = []
     for index in order:
-        if unique:
-            previous = points[unique[-1]]
-            current = points[index]
-            if abs(current[0] - previous[0]) <= eps and abs(current[1] - previous[1]) <= eps:
-                continue
+        if unique and _same_point(points[unique[-1]], points[index], eps):
+            continue
         unique.append(index)
     if len(unique) <= 2:
         return unique
@@ -103,7 +133,9 @@ def convex_hull_2d(points: list[Point2], eps: float = 1e-12) -> list[int]:
     def build(sequence):
         hull: list[int] = []
         for index in sequence:
-            while len(hull) >= 2 and cross2(points[hull[-2]], points[hull[-1]], points[index]) <= eps:
+            while len(hull) >= 2 and cross2(
+                points[hull[-2]], points[hull[-1]], points[index]
+            ) <= eps:
                 hull.pop()
             hull.append(index)
         return hull
