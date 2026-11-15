@@ -44,6 +44,7 @@ TEST_MODULES = [
     "test_contact_region",
     "test_poly2d",
     "test_support_patch",
+    "test_patch",
     "test_diagnostics",
     "test_object_input",
     "test_asset",

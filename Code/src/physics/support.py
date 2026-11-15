@@ -81,14 +81,20 @@ _PATCH_MESH_ERROR = 5e-4
 _PATCH_MAX_SEGMENTS = 256
 
 
-def _segments_for_radius(radius: float, mesh_error: float) -> int:
+def _segments_for_radius(
+    radius: float, mesh_error: float, max_segments: int = _PATCH_MAX_SEGMENTS
+) -> int:
     """按**给定**内缩误差反解圆盘的离散边数。
 
     ``mesh_error`` 是实参而不是读模块常量：早先它写死在函数体里，传 1e-4 还是
     1e-3 结果完全一样，参数实际退化成了"要不要自适应"的布尔开关。
 
-    返回值是**目标误差**下的边数；触到 :data:`_PATCH_MAX_SEGMENTS` 时实际内缩会
-    超标，用 :func:`_ring_inradius_error` 核对，不要假定它一定达标。
+    ``max_segments`` 让调用方按用途另设上限：求交要圆盘足够圆（默认 256），
+    接触流形只需要"点落在交叠区里"（``patch.MAX_CONTACT_SEGMENTS``），后者
+    边数翻倍换来的精度会被后续的 4 点稀疏化直接丢掉，白付求交的 O(N·M)。
+
+    返回值是**目标误差**下的边数；触到上限时实际内缩会超标，用
+    :func:`_ring_inradius_error` 核对，不要假定它一定达标。
     """
     if not mesh_error > 0.0:
         # NaN 也会走到这里：比较为假时一律拒绝
@@ -96,12 +102,14 @@ def _segments_for_radius(radius: float, mesh_error: float) -> int:
     if radius < 0.0:
         # 负半径没有几何意义；构造器已经拦了，这里拦住绕过构造器的调用
         raise ValueError(f"radius 不能为负，收到：{radius!r}")
+    if max_segments < 3:
+        raise ValueError(f"max_segments 至少为 3，收到：{max_segments!r}")
     if radius <= _EPS:
         # 半径为 0 的退化端面：三角形就够表达"一个点"
         return 3
     ratio = max(-1.0, min(1.0, 1.0 - mesh_error / radius))
     count = math.ceil(math.pi / math.acos(ratio))
-    return max(3, min(_PATCH_MAX_SEGMENTS, count))
+    return max(3, min(max_segments, count))
 
 
 def _ring_inradius_error(radius: float, count: int) -> float:
@@ -234,15 +242,18 @@ class SupportPatch:
 
 
 def support_patch_world(
-    body, direction, mesh_error: float = _PATCH_MESH_ERROR
+    body,
+    direction,
+    mesh_error: float = _PATCH_MESH_ERROR,
+    max_segments: int = _PATCH_MAX_SEGMENTS,
 ) -> SupportPatch:
     """沿 ``direction`` 的支撑几何（世界坐标），供切平面求交使用。
 
     与 :func:`feature_world_tagged` 同源、不同用途：
 
-    - 圆盘面按 ``mesh_error`` 由 :func:`_segments_for_radius` 反解边数（可达
-      256 边），而不是固定 4 点——内接四边形比圆盘小 29%，窄搭接时会被算成
-      "不相交"；
+    - 圆盘面按 ``mesh_error`` 由 :func:`_segments_for_radius` 反解边数（默认上限
+      256 边，可用 ``max_segments`` 按用途收紧），而不是固定 4 点——内接四边形
+      比圆盘小 29%，窄搭接时会被算成"不相交"；
     - 返回 :class:`SupportPatch`，不带标签，不给暖启动留误用的余地。
 
     求交本身不在这里（见 ``docs/07`` 的 P0-1 计划）：本函数只回答"沿这个方向，
@@ -275,7 +286,7 @@ def support_patch_world(
     face = _cap_face(geometry, cos_axis)
     if face is not None:
         z_local, radius, sign = face
-        count = _segments_for_radius(radius, mesh_error)
+        count = _segments_for_radius(radius, mesh_error, max_segments)
         vertices = _ring_points(body, z_local, radius, count)
         normal = axis if sign > 0.0 else (-axis[0], -axis[1], -axis[2])
         return SupportPatch(
