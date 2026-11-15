@@ -393,6 +393,121 @@ def test_near_edge_swap_keeps_position() -> tuple[bool, str]:
                           f"位置都在 x≈1.0、|y|≤0.02")
 
 
+def test_tilted_generatrix_per_point_depth() -> tuple[bool, str]:
+    """倾斜母线的深度必须按**端点插值**算，不能压成平均平面。
+
+    圆柱绕 Y 轴转 2° 侧抵盒面（x = 0.295 m）时，侧面选取把整条母线交了下来，
+    它的两个端点沿 X 方向一个是分离 12.6 mm、一个是嵌入 22.3 mm。旧实现用"过顶点
+    均值的垂直平面"，两点都报 4.817 mm——分离的那端凭空多了约束，嵌入的那端少报
+    了 17 mm。现在按切向投影参数插值三维端点，间隙沿母线线性变化。
+    """
+    radius, height = 0.3, 1.0
+    angle = math.radians(2.0)
+    orientation = quat.quat_from_axis_angle((0.0, 1.0, 0.0), angle)
+    cylinder = RigidBody(
+        name="cylinder",
+        geometry=CylinderGeometry(radius, height),
+        mass=1.0,
+        position=(0.0, 0.0, 0.0),
+        orientation=orientation,
+    )
+    box = RigidBody(
+        name="box",
+        geometry=BoxGeometry((1.0, 1.0, 1.0)),
+        mass=1.0,
+        position=(0.795, 0.0, 0.0),     # 左表面在 x = 0.295
+    )
+    wall_x = 0.295
+    contacts = gjk.collide(cylinder, box)
+
+    axis = quat.quat_rotate_vector(orientation, (0.0, 0.0, 1.0))
+    radial = quat.quat_rotate_vector(orientation, (1.0, 0.0, 0.0))
+
+    def surface_x(parameter: float) -> float:
+        """母线上参数 s ∈ [-1, 1] 处的世界 x 坐标（解析，不用 patch 的中间量）。"""
+        return (
+            cylinder.position[0]
+            + parameter * 0.5 * height * axis[0]
+            + radius * radial[0]
+        )
+
+    def parameter_of(point) -> float:
+        """把接触点还原到母线上：位置是两锚点中点，沿 +法向退回 A 侧表面。
+
+        ``position = (a + b)/2``、``penetration = (a − b)·n``，所以
+        ``position + n·penetration/2 = a``（圆柱这一侧的锚点）。
+        """
+        surface = [
+            point.position[i] + 0.5 * point.penetration * point.normal[i]
+            for i in range(3)
+        ]
+        return sum(
+            (surface[i] - cylinder.position[i]) * axis[i] for i in range(3)
+        ) / (0.5 * height)
+
+    problems = []
+    if not contacts:
+        return False, "没有产生接触点"
+    for point in contacts:
+        expected = surface_x(parameter_of(point)) - wall_x
+        if abs(point.penetration - expected) > 1e-6:
+            problems.append(
+                f"z={point.position[2]:.4f}：报 {point.penetration * 1e3:.3f} mm，"
+                f"真实 {expected * 1e3:.3f} mm"
+            )
+        if expected < -1e-9:
+            problems.append(f"z={point.position[2]:.4f} 处已分离，不该建约束")
+    deepest = max(surface_x(parameter_of(point)) - wall_x for point in contacts)
+    if abs(deepest - 0.022267) > 5e-5:
+        problems.append(f"最深点 {deepest * 1e3:.3f} mm，应约 22.27 mm")
+
+    return not problems, ("；".join(problems) if problems else
+                          f"{len(contacts)} 点，深度 {deepest * 1e3:.3f} mm 以内变化，"
+                          f"分离端已被裁掉")
+
+
+def test_segment_clip_has_no_duplicate_anchor() -> tuple[bool, str]:
+    """两点 patch 跨过零间隙：结果必须恰好是"保留端点 + 一个边界交点"。
+
+    把两点输入当成闭合二边形遍历时，正向与反向是同一条边，交点会被插入两次——
+    实测返回三个锚点、其中两个位置重合。重合的锚点会让求解器解两遍同一约束。
+    """
+    segment = SupportPatch(
+        vertices=[(0.0, -0.5, 0.52), (0.0, 0.5, 0.48)],
+        kind=PATCH_SEGMENT,
+        normal=(0.0, 0.0, 1.0),
+    )
+    face = SupportPatch(
+        vertices=[
+            (-0.6, -0.6, 0.5),
+            (0.6, -0.6, 0.5),
+            (0.6, 0.6, 0.5),
+            (-0.6, 0.6, 0.5),
+        ],
+        kind=PATCH_POLYGON,
+        normal=(0.0, 0.0, -1.0),
+    )
+    normal = (0.0, 0.0, 1.0)
+    overlap = patch.overlap(segment, face, normal)
+    anchors = patch.contact_anchors(overlap, segment, face, normal)
+
+    problems = []
+    if len(anchors) != 2:
+        problems.append(f"{len(anchors)} 个锚点，应为 2（一个端点 + 一个边界交点）")
+    else:
+        first, second = anchors
+        if math.dist(first.position, second.position) < 1e-6:
+            problems.append("两个锚点位置重合")
+        depths = sorted(round(anchor.penetration, 9) for anchor in anchors)
+        if abs(depths[0]) > 1e-9:
+            problems.append(f"边界交点的深度应为 0，得到 {depths[0]}")
+        if abs(depths[1] - 0.02) > 1e-9:
+            problems.append(f"保留端点的深度应为 0.02，得到 {depths[1]}")
+
+    return not problems, ("；".join(problems) if problems else
+                          "2 个锚点，深度 0 / 20 mm，无重合")
+
+
 CHECKS = [
     ("1. P0-1 场景的交集落在搭接带内", test_overlap_in_p01_scene),
     ("2. 退化类别以投影结果为准", test_projected_kind_wins),
@@ -403,6 +518,8 @@ CHECKS = [
     ("7. 接触路径的边数预算", test_contact_segment_budget),
     ("8. 倾斜端面逐点深度、高侧不建约束", test_tilted_cap_per_point_depth),
     ("9. 近边缘交换后回退不偏力臂", test_near_edge_swap_keeps_position),
+    ("10. 倾斜母线按端点插值算深度", test_tilted_generatrix_per_point_depth),
+    ("11. 两点裁剪不产生重合锚点", test_segment_clip_has_no_duplicate_anchor),
 ]
 
 

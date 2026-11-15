@@ -93,7 +93,7 @@ docs/
 
 ## 4. 数值入口
 
-- 一键测试：`python Code/tests/run_all.py`（26 个模块、242 项检查，全部通过；
+- 一键测试：`python Code/tests/run_all.py`（26 个模块、244 项检查，全部通过；
   P0-1 的 4 项已于 2026-11-15 转正）。`run_all.py` 会先核对清单与
   `tests/test_*.py` 是否一一对应，漏登记直接失败。
 - 文档同步：`python Code/scripts/sync_docs.py`（改能力矩阵 / 重跑基准后必须执行）。

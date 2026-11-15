@@ -13,7 +13,7 @@
 
 | 编号 | 问题 | 基线（11-01） | 当前（11-15） | 证据 / 位置 |
 |---|---|---|---|---|
-| P0-1 | 通用流形可能在真实接触区域之外产生接触点 | 存在 | **已解决**（2026-11-15）：`gjk._build_manifold` 改为两侧高密度支撑 patch 在切平面求交；后续又修了两处残留——倾斜端面按真实表面逐点算间隙（3° 容差会把整片倾斜圆盘交下来）、空交集回退改用 GJK 的成对见证点（原先各查支撑点，近边缘场景力臂偏 0.25 m） | `physics/support.py`、`physics/patch.py`、`mathutils/poly2d.py`、`tests/test_contact_region.py`、`tests/test_patch.py`、`docs/design/03_contact_manifold.md` §4.3；提交 `c9fd695`、`41c7a4d` |
+| P0-1 | 通用流形可能在真实接触区域之外产生接触点 | 存在 | **已解决**（2026-11-15）：`gjk._build_manifold` 改为两侧高密度支撑 patch 在切平面求交；后续又修了四处残留——倾斜端面按真实表面逐点算间隙（3° 容差会把整片倾斜圆盘交下来）、倾斜母线按端点插值（平均平面把 −12.6 mm/+22.3 mm 压成 4.8 mm）、两点裁剪不再重复插入边界交点、空交集回退改用 GJK 的成对见证点（原先各查支撑点，近边缘场景力臂偏 0.25 m） | `physics/support.py`、`physics/patch.py`、`mathutils/poly2d.py`、`tests/test_contact_region.py`、`tests/test_patch.py`、`docs/design/03_contact_manifold.md` §4.3；提交 `c9fd695`、`41c7a4d` |
 | P0-2 | 多个地面接触点共用暖启动键 | 存在 | **已解决**：地面与 GJK 流形改用特征驱动 ID，批内唯一由测试守住，跨帧稳定到"局部特征级" | 提交 `d8f8108`、`8027a7f`；`tests/test_contact_identity.py`（10 项）；`docs/design/03_contact_manifold.md` §4.1–4.2 |
 | P1-1 | 旋转 TOI 的精确性描述与公式不符 | 存在 | **描述已解决，算法未改**：`TOI 精确性` 新增 `一阶` 档（顶点模型纯平移精确；有自转为瞬时速度外推、无保守上界；返回值另含 200 µm 穿透余量），能力表与生成文档同步；`hull_ground_toi` 仍是首帧外推 | `physics/capabilities.py` `GROUND_IMPL`、`physics/toi.py` docstring、`docs/user-guide/02_场景JSON.md` 生成块、`docs/design/02_collision_pipeline.md` §15 |
 | P1-2 | 支撑特征仍由碰撞模块按形状分类 | 存在 | **部分**：支撑点已下沉到 `GeometrySpec.support`（`support_local` 只做委托）；但"端面 4 点 / 母线端点"这层特征采样仍集中在 `support.py`，新增几何要改 `_cap_face` / `_feature_branches` | `physics/support.py`、`physics/geometry`（`GeometrySpec.support`） |
