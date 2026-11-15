@@ -279,6 +279,125 @@ def test_swap_symmetry() -> tuple[bool, str]:
                           f"凸包下标={a_hull}，面积={area:.6g}，两侧逐位一致")
 
 
+def test_convex_intersection_matrix() -> tuple[bool, str]:
+    """九种退化组合各来一例：点 / 线段 / 多边形两两求交。"""
+    square = [(0.0, 0.0), (2.0, 0.0), (2.0, 2.0), (0.0, 2.0)]
+    cases = [
+        # (说明, A, B, 期望的点集；None 表示只检查"是否为空")
+        ("点在多边形内", [(1.0, 1.0)], square, [(1.0, 1.0)]),
+        ("点在多边形外", [(5.0, 5.0)], square, []),
+        ("点在线段上", [(0.5, 0.0)], [(0.0, 0.0), (1.0, 0.0)], [(0.5, 0.0)]),
+        ("点在线段外", [(0.5, 0.2)], [(0.0, 0.0), (1.0, 0.0)], []),
+        ("线段交叉", [(0.0, 0.0), (2.0, 2.0)], [(0.0, 2.0), (2.0, 0.0)], [(1.0, 1.0)]),
+        ("共线重叠取两端", [(0.0, 0.0), (2.0, 0.0)], [(1.0, 0.0), (3.0, 0.0)],
+         [(1.0, 0.0), (2.0, 0.0)]),
+        ("线段端点相碰", [(0.0, 0.0), (1.0, 0.0)], [(1.0, 0.0), (2.0, 1.0)],
+         [(1.0, 0.0)]),
+        ("平行不共线", [(0.0, 0.0), (1.0, 0.0)], [(0.0, 1.0), (1.0, 1.0)], []),
+        ("线段整段在多边形内", [(0.2, 0.2), (1.8, 1.8)], square,
+         [(0.2, 0.2), (1.8, 1.8)]),
+        ("线段穿过多边形", [(-1.0, 1.0), (3.0, 1.0)], square,
+         [(0.0, 1.0), (2.0, 1.0)]),
+        ("线段在多边形外", [(3.0, 3.0), (4.0, 4.0)], square, []),
+        ("多边形相离", square, [(3.0, 0.0), (5.0, 0.0), (5.0, 2.0), (3.0, 2.0)], []),
+        ("多边形共边（退化成线段）", square,
+         [(2.0, 0.0), (4.0, 0.0), (4.0, 2.0), (2.0, 2.0)],
+         [(2.0, 0.0), (2.0, 2.0)]),
+    ]
+
+    problems = []
+    notes = []
+    for label, a, b, expected in cases:
+        got = poly2d.convex_intersection(a, b)
+        if expected is None:
+            continue
+        if len(got) != len(expected):
+            problems.append(f"{label}：{len(got)} 点，应为 {len(expected)} 点")
+            continue
+        if got:
+            worst = max(
+                min(_max_diff(point, target) for target in expected) for point in got
+            )
+            if worst > 1e-9:
+                problems.append(f"{label}：点位偏差 {worst:.2e}")
+        notes.append(f"{label}={len(got)}")
+
+    # 多边形∩多边形还有面积，顺带核一下
+    overlap = poly2d.convex_intersection(
+        square, [(1.0, 1.0), (3.0, 1.0), (3.0, 3.0), (1.0, 3.0)]
+    )
+    area = abs(poly2d.polygon_area_2d(overlap))
+    if abs(area - 1.0) > 1e-9:
+        problems.append(f"重叠正方形面积={area}，应为 1")
+
+    return not problems, ("；".join(problems) if problems else
+                          f"{len(cases)} 种组合正确，" + "，".join(notes))
+
+
+def test_convex_intersection_symmetry() -> tuple[bool, str]:
+    """交换 A/B 必须给出同一组点；输出永远是 1 / 2 / ≥3 点的规范形式。"""
+    disc = [
+        (math.cos(2.0 * math.pi * index / 100), math.sin(2.0 * math.pi * index / 100))
+        for index in range(100)
+    ]
+    rect = [(0.8, -0.5), (1.8, -0.5), (1.8, 0.5), (0.8, 0.5)]
+    forward = poly2d.convex_intersection(disc, rect)
+    backward = poly2d.convex_intersection(rect, disc)
+
+    problems = []
+    key = lambda points: sorted((round(x, 9), round(y, 9)) for x, y in points)
+    if key(forward) != key(backward):
+        problems.append(f"交换后点集不同：{len(forward)} vs {len(backward)}")
+    if len(forward) < 3:
+        problems.append(f"圆盘与矩形应有 2 维交集，得到 {len(forward)} 点")
+    else:
+        area = poly2d.polygon_area_2d(forward)
+        if area <= 0.0:
+            problems.append(f"输出不是逆时针（面积={area}）")
+        if abs(area - 0.1563) > 1e-3:
+            problems.append(f"交集面积={area:.5f}，解析值约 0.1563")
+    for points in (forward, backward):
+        if len(points) == 3 and abs(poly2d.polygon_area_2d(points)) <= 1e-12:
+            problems.append("返回了零面积的『多边形』")
+        if len(points) > 2 and poly2d.polygon_area_2d(points) < 0.0:
+            problems.append("多边形不是逆时针")
+    if len(set(map(tuple, forward))) != len(forward):
+        problems.append("输出里有重复点")
+
+    return not problems, ("；".join(problems) if problems else
+                          f"{len(forward)} 点，面积={poly2d.polygon_area_2d(forward):.5f}，"
+                          f"交换后点集一致")
+
+
+def test_convex_intersection_large_offset() -> tuple[bool, str]:
+    """平移到 1e6 量级后，交集点数与几何必须不变（接触点会落在远离开原点的位置）。"""
+    disc = [
+        (math.cos(2.0 * math.pi * index / 60), math.sin(2.0 * math.pi * index / 60))
+        for index in range(60)
+    ]
+    rect = [(0.8, -0.5), (1.8, -0.5), (1.8, 0.5), (0.8, 0.5)]
+    shift = (1.0e6, -1.0e6)
+    shifted_disc = [(x + shift[0], y + shift[1]) for x, y in disc]
+    shifted_rect = [(x + shift[0], y + shift[1]) for x, y in rect]
+
+    local = poly2d.convex_intersection(disc, rect)
+    shifted = poly2d.convex_intersection(shifted_disc, shifted_rect)
+
+    problems = []
+    if len(local) != len(shifted):
+        problems.append(f"点数从 {len(local)} 变成 {len(shifted)}")
+    else:
+        restored = [(x - shift[0], y - shift[1]) for x, y in shifted]
+        worst = max(
+            min(_max_diff(point, target) for target in local) for point in restored
+        )
+        if worst > 1e-8:
+            problems.append(f"平移后点位偏差 {worst:.2e} m")
+
+    return not problems, ("；".join(problems) if problems else
+                          f"{len(shifted)} 点，平移前后点位偏差 ≤ 1e-8 m")
+
+
 def test_dedupe_keeps_first() -> tuple[bool, str]:
     """去重保留首次出现的元素，且不改变剩余项的顺序。"""
     items = [
@@ -305,6 +424,9 @@ CHECKS = [
     ("8. 投影保持长度与面积", test_project_and_area),
     ("9. A/B 交换后几何一致", test_swap_symmetry),
     ("10. 去重保留首次出现", test_dedupe_keeps_first),
+    ("11. 凸点集求交：九种组合", test_convex_intersection_matrix),
+    ("12. 求交对 ±交换对称且规范化", test_convex_intersection_symmetry),
+    ("13. 1e6 平移下求交不变", test_convex_intersection_large_offset),
 ]
 
 
