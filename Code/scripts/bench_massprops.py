@@ -196,7 +196,7 @@ def run_formula_check(reference: float) -> None:
 
     print("-" * 96)
     print("实测偏差增量与 h² 逐位吻合：修正量 = M h² / 6 是**解析推导**的结果，")
-    print("不是拟合出来的经验系数。推导见 docs/09 第 3 节。")
+    print("不是拟合出来的经验系数。推导见 docs/design/05_mass_properties.md 第 3 节。")
 
 
 def main() -> int:

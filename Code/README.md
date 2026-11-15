@@ -5,14 +5,22 @@ W4 暖启动 + 文档守卫 ✅**
 
 自写刚体物理，未使用任何现成物理引擎（无 MuJoCo / Bullet / PhysX / Unity / UE）。
 
-详细文档见 `../docs/`：
+详细文档见 `../docs/`（读法与冲突裁决：`docs/00_INDEX.md`）：
 
 | 文档 | 内容 |
 |---|---|
-| `01_环境与运行指南.md` | 目录结构、环境要求、三种运行方式、常见问题、耗时参考 |
-| `02_场景JSON规范.md` | 场景文件全部字段的说明与约定（含 `physics` / `simulation` 段） |
-| `03_Phase0_实验报告.md` | 8 组渲染参数对比实验的结论与踩坑记录 |
-| `04_W2_球体刚体求解器.md` | 求解器原理、6 项数值验证、视频产出、踩坑记录 |
+| `user-guide/01_运行指南.md` | 目录结构、环境要求、三种运行方式、常见问题、耗时参考 |
+| `user-guide/02_场景JSON.md` | 场景文件全部字段的说明与约定（含 `physics` / `simulation` 段） |
+| `user-guide/03_资产管道.md` | OBJ/STL/点云 → 惯量与碰撞代理；三个输出资产文件 |
+| `design/01_architecture.md` | 四层结构、一步仿真的数据流、唯一真值、改动入口 |
+| `design/02_collision_pipeline.md` | 盒-球 → 凸包 → 广义 SAT → GJK/EPA → TOI |
+| `design/03_contact_manifold.md` | 接触流形与接触点身份（含 P0-1 的 patch 求交） |
+| `design/04_solver.md` | 顺序冲量求解器实现与策略校准 |
+| `design/05_mass_properties.md` | 解析惯量、网格、点云与截断修正 |
+| `experiments/01_phase0_rendering.md` | 8 组渲染参数对比实验的结论与踩坑记录 |
+| `experiments/02_broadphase.md` | 空间哈希、加速比与那次不公平的比较 |
+| `experiments/03_warm_start.md` | 暖启动开/关的穿透、收敛、耗时对照 |
+| `reviews/architecture_review_2026-11-01.md` | 外部架构审阅基线（带当前进度状态表） |
 
 ---
 
@@ -127,8 +135,8 @@ GLB 含渲染网格 + 碰撞线框 + 质心 + 主轴（共 12 个节点），**�
 
 支持 `.obj` / `.stl`（ASCII 与二进制自动识别）/ 文本点云（含 `random:N:SEED:SX,SY,SZ`
 现场生成，种子进输入卡）。报告会同时给出完整张量与主惯量、非对角占比、
-凸包面棱数与 SAT 轴数。详见 `docs/11_物体输入管道.md`、
-`docs/13_输出资产体系.md`；点云修正项的现状见 `docs/12_点云截断修正的算法路径.md`。
+凸包面棱数与 SAT 轴数。输入侧与输出资产侧详见 `docs/user-guide/03_资产管道.md`
+（第 1、2 部分）；点云修正项的现状见 `docs/design/05_mass_properties.md` 第 2 部分。
 
 ### 4. 装配场景（只存引用）
 
@@ -236,7 +244,7 @@ Code/
 │       ├── sat.py           盒-盒 SAT + 参考面/入射面裁剪（最多 4 点）
 │       ├── convex_sat.py    广义 SAT：任意凸多面体（面法向 + 棱叉积）+ 球-凸包最近点
 │       ├── toi.py           预测接触时刻（球走精确解；盒/凸包走顶点精确解
-│       │                    + SAT 轴保守推进，见 docs/10 第 6 节）
+│       │                    + SAT 轴保守推进，见 docs/design/02_collision_pipeline.md 第 15 节）
 │       ├── validate.py      初始互相嵌入检测
 │       ├── solver.py        顺序冲量求解器
 │       └── world.py         单步流程、TOI 分段、积分、位姿导出
@@ -311,7 +319,7 @@ Python 里跑测试，不能拖着一个 Blender 环境。
 - **锥 / 台 / 椭球 / 球冠四种参数化图元**：闭式惯量（质心不在原点，构造时平移到原点），
   窄相复用同一套支撑映射 + GJK/EPA，地面接触由"支撑特征通用解"承担——端面圆盘给 4 点
   面接触、尖端/极点给 1 点。它们已经进能力矩阵，可以**直接**写进场景 JSON
-  （`docs/02` §5.1），不必再借组合体包装；验收见 `tests/test_ground_generic.py` 第 10 项
+  （`docs/user-guide/02_场景JSON.md` §5.1），不必再借组合体包装；验收见 `tests/test_ground_generic.py` 第 10 项
 - 顺序冲量求解：法向冲量、库仑摩擦（双切向）、Baumgarte 位置修正
 - **暖启动**：跨帧复用上一子步的法向累积冲量，键为 (body_a, body_b, `feature_id`)。
   只暖启动法向（切向会累积成力矩）、每个子步只施加一次（TOI 切段时不能重复计费）。
@@ -321,9 +329,9 @@ Python 里跑测试，不能拖着一个 Blender 环境。
   `tag_a*512 + tag_b`，标签统一由 `support.feature_world_tagged()` 产出。
   此前地面多点共用 `0`、GJK 流形用列表下标：偏心负载下四角累积冲量实测
   0.011 / 0.015 / 0.030 / 0.026（差近 3 倍），共用键会让它们互相覆盖。见
-  `docs/07` §4.1、`tests/test_contact_identity.py`。
+  `docs/design/03_contact_manifold.md` §4.1、`tests/test_contact_identity.py`。
   强度要说清：**批内唯一是硬要求**。跨帧稳定已达到"局部特征级"——盒/凸包顶点、
-  母线端点、回转体端面槽位都稳定（圆周起点已固定在体坐标系，见 `docs/07` §4.2），
+  母线端点、回转体端面槽位都稳定（圆周起点已固定在体坐标系，见 `docs/design/03_contact_manifold.md` §4.2），
   但端面/侧面/单点模式切换时会失效。完整匹配要等两侧局部锚点 + 有效性校验
 - 完整转动动力学：惯量张量、世界坐标逆惯量、力矩冲量、转动动能
 - 静态物体（逆质量为零，求解器无分支）
@@ -373,11 +381,11 @@ Python 里跑测试，不能拖着一个 Blender 环境。
 
 **尚未实现**
 
-- 凸分解（V-HACD 类）：组合体已经能手工拼出凹体（`CompoundGeometry`，见 `docs/02`），
+- 凸分解（V-HACD 类）：组合体已经能手工拼出凹体（`CompoundGeometry`，见 `docs/user-guide/02_场景JSON.md`），
   但还不能从单一网格**自动**分解成凸块
 - 凸包简化（网格超过 64 面时直接报错，尚未自动降面）
 - **点云截断修正的密度估计**：现在用最近邻距离直接当 $h_i$，对非规则排布有
-  系统性偏差（同样密度下点阵与泊松的 $r_1$ 差 1.8 倍）。规格见 `docs/12`
+  系统性偏差（同样密度下点阵与泊松的 $r_1$ 差 1.8 倍）。规格见 `docs/design/05_mass_properties.md`
 - **资产批处理**：一次一个文件；多物体场景需手工拼
 - 资产材质继承：固定一套灰蓝，还不能从源网格继承
 - PLY / GLTF；多物体批量处理

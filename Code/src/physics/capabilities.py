@@ -4,7 +4,7 @@
 为什么需要这个模块
 ------------------
 这个仓库出过一次很典型的文档漂移：``toi.py`` 在 W3 就覆盖了盒与凸包，但
-``docs/06``、``docs/07``、``Code/README.md`` 里仍写着"TOI 只对球有效"，而且
+``docs/design/02_collision_pipeline.md``、``docs/design/03_contact_manifold.md``、``Code/README.md`` 里仍写着"TOI 只对球有效"，而且
 README 同一份文件里前后自相矛盾。根因不是谁粗心，而是**散文写的能力清单
 没法被验证**——它迟早会过期，而读者会相信更悲观的那一份。
 

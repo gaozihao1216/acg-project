@@ -13,13 +13,13 @@
 
 | 编号 | 问题 | 基线（11-01） | 当前（11-15） | 证据 / 位置 |
 |---|---|---|---|---|
-| P0-1 | 通用流形可能在真实接触区域之外产生接触点 | 存在 | **已解决**（2026-11-15）：`gjk._build_manifold` 改为两侧高密度支撑 patch 在切平面求交；后续又修了两处残留——倾斜端面按真实表面逐点算间隙（3° 容差会把整片倾斜圆盘交下来）、空交集回退改用 GJK 的成对见证点（原先各查支撑点，近边缘场景力臂偏 0.25 m） | `physics/support.py`、`physics/patch.py`、`mathutils/poly2d.py`、`tests/test_contact_region.py`、`tests/test_patch.py`、`docs/07` §4.3；提交 `c9fd695`、`41c7a4d` |
-| P0-2 | 多个地面接触点共用暖启动键 | 存在 | **已解决**：地面与 GJK 流形改用特征驱动 ID，批内唯一由测试守住，跨帧稳定到"局部特征级" | 提交 `d8f8108`、`8027a7f`；`tests/test_contact_identity.py`（10 项）；`docs/07` §4.1–4.2 |
-| P1-1 | 旋转 TOI 的精确性描述与公式不符 | 存在 | **描述已解决，算法未改**：`TOI 精确性` 新增 `一阶` 档（顶点模型纯平移精确；有自转为瞬时速度外推、无保守上界；返回值另含 200 µm 穿透余量），能力表与生成文档同步；`hull_ground_toi` 仍是首帧外推 | `physics/capabilities.py` `GROUND_IMPL`、`physics/toi.py` docstring、`docs/02` 生成块、`docs/10` §6 |
+| P0-1 | 通用流形可能在真实接触区域之外产生接触点 | 存在 | **已解决**（2026-11-15）：`gjk._build_manifold` 改为两侧高密度支撑 patch 在切平面求交；后续又修了两处残留——倾斜端面按真实表面逐点算间隙（3° 容差会把整片倾斜圆盘交下来）、空交集回退改用 GJK 的成对见证点（原先各查支撑点，近边缘场景力臂偏 0.25 m） | `physics/support.py`、`physics/patch.py`、`mathutils/poly2d.py`、`tests/test_contact_region.py`、`tests/test_patch.py`、`docs/design/03_contact_manifold.md` §4.3；提交 `c9fd695`、`41c7a4d` |
+| P0-2 | 多个地面接触点共用暖启动键 | 存在 | **已解决**：地面与 GJK 流形改用特征驱动 ID，批内唯一由测试守住，跨帧稳定到"局部特征级" | 提交 `d8f8108`、`8027a7f`；`tests/test_contact_identity.py`（10 项）；`docs/design/03_contact_manifold.md` §4.1–4.2 |
+| P1-1 | 旋转 TOI 的精确性描述与公式不符 | 存在 | **描述已解决，算法未改**：`TOI 精确性` 新增 `一阶` 档（顶点模型纯平移精确；有自转为瞬时速度外推、无保守上界；返回值另含 200 µm 穿透余量），能力表与生成文档同步；`hull_ground_toi` 仍是首帧外推 | `physics/capabilities.py` `GROUND_IMPL`、`physics/toi.py` docstring、`docs/user-guide/02_场景JSON.md` 生成块、`docs/design/02_collision_pipeline.md` §15 |
 | P1-2 | 支撑特征仍由碰撞模块按形状分类 | 存在 | **部分**：支撑点已下沉到 `GeometrySpec.support`（`support_local` 只做委托）；但"端面 4 点 / 母线端点"这层特征采样仍集中在 `support.py`，新增几何要改 `_cap_face` / `_feature_branches` | `physics/support.py`、`physics/geometry`（`GeometrySpec.support`） |
 | P1-3 | 能力声明与算法规则仍重复维护 | 存在 | **未开始**：`capabilities.py` 仍是手写表（已改善的一点是 `is_supported` / `supported_pair` 由表派生，不再另写一份） | `physics/capabilities.py`、`tests/test_capabilities.py` |
-| P2 | 范围 / 性能 / 证据方面的限制 | 存在 | **部分**：宽阶段与暖启动已有加速比与 A/B 证据；500 体目标、`earliest_toi` 的 O(N²) 未处理 | `docs/08` §10、`docs/05` §7 |
-| M1–M6 | 分阶段迁移 | 计划 | M1 已完成；M2 进行中；M3（接触区域生成）阻塞在 P0-1；M4/M5 部分；M6 未开始 | `docs/07` §8、`docs/00_INDEX.md` |
+| P2 | 范围 / 性能 / 证据方面的限制 | 存在 | **部分**：宽阶段与暖启动已有加速比与 A/B 证据；500 体目标、`earliest_toi` 的 O(N²) 未处理 | `docs/experiments/02_broadphase.md` §10、`docs/design/04_solver.md` §18 |
+| M1–M6 | 分阶段迁移 | 计划 | M1 已完成；M2 进行中；M3（接触区域生成）阻塞在 P0-1；M4/M5 部分；M6 未开始 | `docs/design/03_contact_manifold.md` §8、`docs/00_INDEX.md` |
 
 读本文时请配合 `docs/00_INDEX.md` 的裁决顺序：**能力边界的唯一真值是
 `physics/capabilities.py`**，文档里的生成块由 `sync_docs.py` 产出，散文描述只作解释。

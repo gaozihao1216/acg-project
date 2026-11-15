@@ -619,7 +619,7 @@ class SimulationSpec:
 
         所有缺省值都**从 ``cls()`` 取**，不在本函数里另抄一遍。这里曾经把
         ``substeps``/``iterations`` 硬编码为 2/12，而构造函数早就按
-        ``scripts/bench_solver_strategy.py`` 的实测改成 3/8（见 ``docs/05``）。
+        ``scripts/bench_solver_strategy.py`` 的实测改成 3/8（见 ``docs/design/04_solver.md``）。
         于是"程序内默认"和"JSON 默认"静默分叉：手写场景只要不显式写这两个
         字段，走的就是已被否决的旧参数，而代码里看不出任何异常。
         单一定义处消除这类漂移。

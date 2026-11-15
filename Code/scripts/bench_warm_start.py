@@ -120,7 +120,7 @@ def _scene(name: str, objects: list[ObjectSpec]) -> SceneSpec:
             iterations=8,
             ground_z=0.0,
             duration=DURATION,
-            # 堆叠场景不需要 TOI 切分（`docs/05`：稠密堆叠靠暖启动 + 子步），
+            # 堆叠场景不需要 TOI 切分（`docs/design/04_solver.md`：稠密堆叠靠暖启动 + 子步），
             # 关掉它能把测量时间压到可接受范围，也让差异只来自暖启动本身
             use_toi_splitting=False,
         ),

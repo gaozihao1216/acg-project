@@ -4,7 +4,7 @@
 为什么要有这个文件
 ------------------
 这个仓库出现过一次成规模的文档漂移：``toi.py`` 在 W3 就覆盖了盒与凸包，但
-``docs/06``、``docs/07``、``Code/README.md`` 里仍写着"TOI 只对球有效"，README
+``docs/design/02_collision_pipeline.md``、``docs/design/03_contact_manifold.md``、``Code/README.md`` 里仍写着"TOI 只对球有效"，README
 同一份文件里还前后矛盾。根源不是谁粗心，而是**没有任何东西会因为你写错而失败**。
 
 本文件把三件事钉住：

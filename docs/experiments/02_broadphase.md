@@ -213,7 +213,7 @@ N=20   暴力 7.77us   哈希 87.40us   0.09x
 
 ## 9. 接口
 
-新增两个 `simulation` 字段（`docs/02_场景JSON规范.md` 有完整说明）：
+新增两个 `simulation` 字段（`docs/user-guide/02_场景JSON.md` 有完整说明）：
 
 | 字段 | 默认 | 说明 |
 |---|---|---|

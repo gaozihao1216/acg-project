@@ -1,6 +1,6 @@
-# 盒-盒 SAT 与接触流形裁剪
+# 接触流形：盒-盒裁剪、接触身份与支撑 patch 求交
 
-> 窄相：`Code/src/physics/sat.py`
+> 窄相：`Code/src/physics/sat.py`（盒-盒）、`Code/src/physics/gjk.py`（任意凸体）
 > 测试：`python Code/tests/test_box_box.py`（10 项）
 > 演示：`results/w2/demo_box_stack.mp4`（37 帧 / 24 fps / 1.5 s）
 
@@ -318,8 +318,8 @@ Gauss–Seidel 在同一个方向上反复修正，收敛比"法向各异的一�
 | 问题 | 现状 | 下一步 |
 |---|---|---|
 | 流形点落在接触区外（P0-1） | **已修复**（W6）：两侧支撑 patch 在切平面求交，见 §4.3 | 空交集退化成单点并计数；若 `patch.fallback_count()` 频繁增长，回头查边数与容差 |
-| 暖启动 | **已完成**（W4）：键 = (body_a, body_b, feature_id)，只暖启动法向、每子步只施加一次 | 对照实验见 `docs/05` §8；默认开启，`iterations` 保持 8 |
+| 暖启动 | **已完成**（W4）：键 = (body_a, body_b, feature_id)，只暖启动法向、每子步只施加一次 | 对照实验见 `docs/experiments/03_warm_start.md`；默认开启，`iterations` 保持 8 |
 | 流形块求解 | 4 个点各自独立迭代 | Box2D 会把 2 点当成一组解 LCP，收敛更快 |
-| TOI 分段 | **盒/凸包已覆盖**（`docs/10` §6：落地走逐顶点外推——顶点模型纯平移精确、有自转是一阶近似且无保守上界，返回时刻另含 200 µm 余量；盒-盒走 SAT 轴保守推进；球-盒走最近点）。本行原写"只对球有效"，是 W2 的旧状态；"顶点精确解"的说法见 `docs/10` §6 的校准 | 不再单纯补精度：`earliest_toi` 仍是 O(N²)，且与"子步优先"在成本上冲突（`docs/05` §7） |
-| 空间哈希 | **已完成**（`docs/08`：密集 7.7×、散开 39×，保留暴力基线） | — |
+| TOI 分段 | **盒/凸包已覆盖**（`docs/design/02_collision_pipeline.md` §15：落地走逐顶点外推——顶点模型纯平移精确、有自转是一阶近似且无保守上界，返回时刻另含 200 µm 余量；盒-盒走 SAT 轴保守推进；球-盒走最近点）。本行原写"只对球有效"，是 W2 的旧状态；"顶点精确解"的说法见 `docs/design/02_collision_pipeline.md` §15 的校准 | 不再单纯补精度：`earliest_toi` 仍是 O(N²)，且与"子步优先"在成本上冲突（`docs/design/04_solver.md` §18） |
+| 空间哈希 | **已完成**（`docs/experiments/02_broadphase.md`：密集 7.7×、散开 39×，保留暴力基线） | — |
 | 棱-棱的接触点 | 取两棱最近点中点 | 足够用；更严格做法是参考 Box2D 的边-边分离公式 |
