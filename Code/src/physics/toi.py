@@ -35,10 +35,8 @@ import math
 from ..mathutils import vec3
 from ..geom.geometry import (
     BoxGeometry,
-    CapsuleGeometry,
     CompoundGeometry,
     ConvexHullGeometry,
-    CylinderGeometry,
     SphereGeometry,
 )
 from . import gjk as _gjk
@@ -55,9 +53,6 @@ from .convex_sat import (
 )
 from .narrowphase import GroundPlane
 from .support import support_world
-
-#: 侧面是曲面的几何：没有有限 SAT 轴集合，TOI 走"GJK 距离 + 保守推进"。
-_CURVED = (CylinderGeometry, CapsuleGeometry)
 
 #: 判定"相对速度可忽略"的阈值（m/s）。低于此值不认为会再次碰撞。
 _MIN_CLOSING_SPEED_SQUARED = 1e-20

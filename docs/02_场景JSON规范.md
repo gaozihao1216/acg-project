@@ -372,8 +372,8 @@ B 再撞 C），一次性检测会把它们当成"同时接触"。开启 `use_to
 | 几何 | 窄相 | TOI | TOI 性质 |
 |---|---|---|---|
 | 球 - 地面 | ✅ `collide_sphere_ground` | ✅ `sphere_ground_toi` | 精确（一元一次方程） |
-| 盒 - 地面 | ✅ `collide_box_ground` | ✅ `hull_ground_toi` | 精确（顶点解，含自转） |
-| 凸包 - 地面 | ✅ `collide_hull_ground` | ✅ `hull_ground_toi` | 精确（顶点解，含自转） |
+| 盒 - 地面 | ✅ `collide_box_ground` | ✅ `hull_ground_toi` | 一阶（瞬时速度外推：纯平移精确，无保守保证） |
+| 凸包 - 地面 | ✅ `collide_hull_ground` | ✅ `hull_ground_toi` | 一阶（瞬时速度外推：纯平移精确，无保守保证） |
 | 柱 - 地面 | ✅ `collide_cylinder_ground` | ✅ `curved_ground_toi` | 保守（端面圆周最低点 + 自转上界） |
 | 胶囊 - 地面 | ✅ `collide_capsule_ground` | ✅ `curved_ground_toi` | 保守（端球最低点 + 自转上界） |
 | 圆锥 - 地面 | ✅ `collide_convex_ground` | ✅ `curved_ground_toi` | 保守（支撑特征最低点 + 自转上界） |
@@ -384,7 +384,10 @@ B 再撞 C），一次性检测会把它们当成"同时接触"。开启 `use_to
 <!-- capabilities:end -->
 
 "精确"= 在匀速直线 / 定轴旋转假设下与解析解一致（可能带固定余量，见下面第 1 条）；
-"保守"= 可能偏早、绝不偏晚——偏早只多切一刀，偏晚才会漏切分。
+"保守"= 可能偏早、绝不偏晚——偏早只多切一刀，偏晚才会漏切分；
+"一阶"= 纯平移时精确，有自转时把首帧瞬时速度当常数做直线外推：顶点实际走圆弧，
+所以偏差是一阶量、且**可能偏晚**（多面体落地属于这一档，见 `docs/10` §6 的反例统计）。
+它与"保守"的区别就是没有偏晚上界，因此不能按解析解逐位比对。
 
 柱与胶囊的侧面/端帽是**曲面**，没有有限 SAT 轴集合可用，因此它们（以及将来
 新增的几何）统一走 **支撑映射 + GJK/EPA**：宽阶段照旧，窄相用 GJK 求分离距离、
