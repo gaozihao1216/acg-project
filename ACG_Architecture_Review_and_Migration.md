@@ -15,7 +15,7 @@
 |---|---|---|---|---|
 | P0-1 | 通用流形可能在真实接触区域之外产生接触点 | 存在 | **部分**：支撑集已经能"高密度且无身份"地取出（`SupportPatch` + `poly2d`），但切平面求交与流形重建**尚未接线**，验收 4 项仍 `XFAIL` | `physics/support.py` `support_patch_world`、`mathutils/poly2d.py`、`tests/test_contact_region.py`、`docs/07` §4.3；提交 `c9fd695`、`41c7a4d` |
 | P0-2 | 多个地面接触点共用暖启动键 | 存在 | **已解决**：地面与 GJK 流形改用特征驱动 ID，批内唯一由测试守住，跨帧稳定到"局部特征级" | 提交 `d8f8108`、`8027a7f`；`tests/test_contact_identity.py`（10 项）；`docs/07` §4.1–4.2 |
-| P1-1 | 旋转 TOI 的精确性描述与公式不符 | 存在 | **描述已解决，算法未改**：`TOI 精确性` 新增 `一阶` 档（纯平移精确；有自转为瞬时速度外推、无保守上界），能力表与生成文档同步；`hull_ground_toi` 仍是首帧外推 | `physics/capabilities.py` `GROUND_IMPL`、`physics/toi.py` docstring、`docs/02` 生成块、`docs/10` §6 |
+| P1-1 | 旋转 TOI 的精确性描述与公式不符 | 存在 | **描述已解决，算法未改**：`TOI 精确性` 新增 `一阶` 档（顶点模型纯平移精确；有自转为瞬时速度外推、无保守上界；返回值另含 200 µm 穿透余量），能力表与生成文档同步；`hull_ground_toi` 仍是首帧外推 | `physics/capabilities.py` `GROUND_IMPL`、`physics/toi.py` docstring、`docs/02` 生成块、`docs/10` §6 |
 | P1-2 | 支撑特征仍由碰撞模块按形状分类 | 存在 | **部分**：支撑点已下沉到 `GeometrySpec.support`（`support_local` 只做委托）；但"端面 4 点 / 母线端点"这层特征采样仍集中在 `support.py`，新增几何要改 `_cap_face` / `_feature_branches` | `physics/support.py`、`physics/geometry`（`GeometrySpec.support`） |
 | P1-3 | 能力声明与算法规则仍重复维护 | 存在 | **未开始**：`capabilities.py` 仍是手写表（已改善的一点是 `is_supported` / `supported_pair` 由表派生，不再另写一份） | `physics/capabilities.py`、`tests/test_capabilities.py` |
 | P2 | 范围 / 性能 / 证据方面的限制 | 存在 | **部分**：宽阶段与暖启动已有加速比与 A/B 证据；500 体目标、`earliest_toi` 的 O(N²) 未处理 | `docs/08` §10、`docs/05` §7 |

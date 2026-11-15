@@ -372,8 +372,8 @@ B 再撞 C），一次性检测会把它们当成"同时接触"。开启 `use_to
 | 几何 | 窄相 | TOI | TOI 性质 |
 |---|---|---|---|
 | 球 - 地面 | ✅ `collide_sphere_ground` | ✅ `sphere_ground_toi` | 精确（一元一次方程） |
-| 盒 - 地面 | ✅ `collide_box_ground` | ✅ `hull_ground_toi` | 一阶（瞬时速度外推：纯平移精确，无保守保证） |
-| 凸包 - 地面 | ✅ `collide_hull_ground` | ✅ `hull_ground_toi` | 一阶（瞬时速度外推：纯平移精确，无保守保证） |
+| 盒 - 地面 | ✅ `collide_box_ground` | ✅ `hull_ground_toi` | 一阶（顶点模型纯平移精确；返回值含 200 µm 余量，无保守保证） |
+| 凸包 - 地面 | ✅ `collide_hull_ground` | ✅ `hull_ground_toi` | 一阶（顶点模型纯平移精确；返回值含 200 µm 余量，无保守保证） |
 | 柱 - 地面 | ✅ `collide_cylinder_ground` | ✅ `curved_ground_toi` | 保守（端面圆周最低点 + 自转上界） |
 | 胶囊 - 地面 | ✅ `collide_capsule_ground` | ✅ `curved_ground_toi` | 保守（端球最低点 + 自转上界） |
 | 圆锥 - 地面 | ✅ `collide_convex_ground` | ✅ `curved_ground_toi` | 保守（支撑特征最低点 + 自转上界） |

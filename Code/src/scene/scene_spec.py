@@ -919,14 +919,3 @@ def load_scene(path: str) -> SceneSpec:
             ) from exc
 
     return SceneSpec.from_dict(data)
-
-
-def save_scene(scene: SceneSpec, path: str) -> None:
-    """把场景写回 JSON 文件，目录不存在时自动创建。
-
-    实验脚本用它把"基础场景 + 参数覆盖"落盘，保证实验可复现。
-    """
-    directory = os.path.dirname(os.path.abspath(path))
-    os.makedirs(directory, exist_ok=True)
-    with open(path, "w", encoding="utf-8") as fh:
-        json.dump(scene.to_dict(), fh, ensure_ascii=False, indent=2)

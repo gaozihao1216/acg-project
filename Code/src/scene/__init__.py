@@ -1,5 +1,9 @@
 # -*- coding: utf-8 -*-
-"""场景描述：JSON 解析、参数覆盖、落盘。"""
+"""场景描述：JSON 解析与参数覆盖。
+
+写出场景由调用方自己完成（脚本写自己的 JSON，资产走 `geom.scene_asset`），
+所以这里只保留 `load_scene()` 与 `SceneSpec.to_dict()`。
+"""
 
 from .scene_spec import (
     CameraSpec,
@@ -10,7 +14,6 @@ from .scene_spec import (
     RenderSpec,
     SceneSpec,
     load_scene,
-    save_scene,
 )
 from .patch import apply_patches
 
@@ -23,6 +26,5 @@ __all__ = [
     "ObjectSpec",
     "SceneSpec",
     "load_scene",
-    "save_scene",
     "apply_patches",
 ]

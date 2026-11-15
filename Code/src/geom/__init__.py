@@ -14,10 +14,9 @@ from .geometry import (
     GeometrySpec,
     SphereGeometry,
     SphericalCapGeometry,
-    supported_geometry_types,
 )
 from .inertia import compute_inertia
-from .transform import TransformSpec, identity_transform, look_at_transform
+from .transform import TransformSpec
 
 __all__ = [
     "GeometrySpec",
@@ -32,9 +31,6 @@ __all__ = [
     "ConvexHullGeometry",
     "CompoundGeometry",
     "CompoundPart",
-    "supported_geometry_types",
     "TransformSpec",
-    "identity_transform",
-    "look_at_transform",
     "compute_inertia",
 ]

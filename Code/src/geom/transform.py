@@ -20,7 +20,6 @@
 
 from __future__ import annotations
 
-import math
 from typing import Sequence
 
 from ..mathutils import quaternion as quat
@@ -51,6 +50,9 @@ class TransformSpec:
         position    : 平移，默认原点
         orientation : 姿态四元数，默认无旋转
         scale       : 视觉缩放，默认不缩放
+
+        三个参数都有默认值，所以**单位变换就是 ``TransformSpec()``**，本模块不再
+        单独提供单位变换构造函数：多一个函数只会多一处"默认值到底是谁"的分歧。
         """
         self.position = (float(position[0]), float(position[1]), float(position[2]))
         self.orientation = quat.quat_normalize(orientation)
@@ -160,96 +162,3 @@ class TransformSpec:
             self.scale[2] * other.scale[2],
         )
         return TransformSpec(new_pos, new_orientation, new_scale)
-
-
-def identity_transform() -> TransformSpec:
-    """返回位于原点、无旋转、无缩放的单位变换，作为默认值使用。"""
-    return TransformSpec()
-
-
-def look_at_transform(
-    eye: Vec3,
-    target: Vec3,
-    up: Vec3 = (0.0, 0.0, 1.0),
-) -> tuple[TransformSpec, float]:
-    """构造"从 eye 看向 target"的相机变换。
-
-    返回值第二项是绕世界 Z 轴的偏航角（弧度），仅用于调试输出。
-
-    注意这里只负责**姿态**，相机的视场角由 ``CameraSpec.fov`` 单独决定。
-    坐标约定与 Blender 一致：相机朝 -Z，上方向为 +Y。
-    """
-    dx = float(target[0]) - float(eye[0])
-    dy = float(target[1]) - float(eye[1])
-    dz = float(target[2]) - float(eye[2])
-    dist = math.sqrt(dx * dx + dy * dy + dz * dz)
-    if dist < 1e-12:
-        raise ValueError("相机位置与目标点重合，无法确定朝向")
-
-    fx, fy, fz = dx / dist, dy / dist, dz / dist
-
-    # 前向叉乘上方向得到右方向；若平行则退化，用 x 轴兜底
-    rx = fy * float(up[2]) - fz * float(up[1])
-    ry = fz * float(up[0]) - fx * float(up[2])
-    rz = fx * float(up[1]) - fy * float(up[0])
-    rlen = math.sqrt(rx * rx + ry * ry + rz * rz)
-    if rlen < 1e-9:
-        rx, ry, rz = 1.0, 0.0, 0.0
-    else:
-        rx, ry, rz = rx / rlen, ry / rlen, rz / rlen
-
-    # 上方向 = 右方向叉乘前向
-    ux = ry * fz - rz * fy
-    uy = rz * fx - rx * fz
-    uz = rx * fy - ry * fx
-
-    orientation = _quat_from_basis((rx, ry, rz), (ux, uy, uz), (-fx, -fy, -fz))
-    return TransformSpec(position=eye, orientation=orientation), math.atan2(dy, dx)
-
-
-def _quat_from_basis(
-    right: Vec3,
-    up: Vec3,
-    back: Vec3,
-) -> tuple[float, float, float, float]:
-    """由三个正交基向量构造旋转四元数。
-
-    参数
-    ----
-    right, up, back : 分别是局部坐标系的 X、Y、Z 轴在世界坐标系下的方向。
-                      必须构成右手正交基。
-
-    实现说明：内部先把基写成 3x3 矩阵，再用 Shepperd 方法从矩阵反解
-    四元数——这样能避免在接近 180° 旋转时出现除零。
-    """
-    m00, m01, m02 = right[0], up[0], back[0]
-    m10, m11, m12 = right[1], up[1], back[1]
-    m20, m21, m22 = right[2], up[2], back[2]
-
-    trace = m00 + m11 + m22
-    if trace > 0.0:
-        s = math.sqrt(trace + 1.0) * 2.0
-        w = 0.25 * s
-        x = (m21 - m12) / s
-        y = (m02 - m20) / s
-        z = (m10 - m01) / s
-    elif m00 > m11 and m00 > m22:
-        s = math.sqrt(1.0 + m00 - m11 - m22) * 2.0
-        w = (m21 - m12) / s
-        x = 0.25 * s
-        y = (m01 + m10) / s
-        z = (m02 + m20) / s
-    elif m11 > m22:
-        s = math.sqrt(1.0 + m11 - m00 - m22) * 2.0
-        w = (m02 - m20) / s
-        x = (m01 + m10) / s
-        y = 0.25 * s
-        z = (m12 + m21) / s
-    else:
-        s = math.sqrt(1.0 + m22 - m00 - m11) * 2.0
-        w = (m10 - m01) / s
-        x = (m02 + m20) / s
-        y = (m12 + m21) / s
-        z = 0.25 * s
-
-    return quat.quat_normalize((w, x, y, z))

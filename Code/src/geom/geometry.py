@@ -1518,8 +1518,3 @@ _GEOMETRY_REGISTRY = {
     # 组合体：若干基本几何体 + 各自的局部位姿
     "compound": lambda d: CompoundGeometry.from_dict(d),
 }
-
-
-def supported_geometry_types() -> list[str]:
-    """返回当前支持的几何类型名列表，供报错信息与文档生成使用。"""
-    return sorted(_GEOMETRY_REGISTRY)
