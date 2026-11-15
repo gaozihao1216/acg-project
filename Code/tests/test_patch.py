@@ -26,6 +26,7 @@ if _CODE_ROOT not in sys.path:
     sys.path.insert(0, _CODE_ROOT)
 
 from src.geom.geometry import BoxGeometry, CylinderGeometry
+from src.mathutils import quaternion as quat
 from src.physics import gjk, patch
 from src.physics.body import RigidBody
 from src.physics.support import (
@@ -69,12 +70,14 @@ def test_overlap_in_p01_scene() -> tuple[bool, str]:
     if not result.points:
         problems.append(f"交集为空（reason={result.empty_reason}）")
         return False, "；".join(problems)
-    if len(result.points) > patch.MAX_CONTACT_POINTS:
-        problems.append(f"{len(result.points)} 点，超过上限 {patch.MAX_CONTACT_POINTS}")
     if result.empty_reason is not None:
         problems.append(f"非空却带着 empty_reason={result.empty_reason}")
 
-    anchors = patch.lift_anchors(result, patch_a, patch_b, NORMAL)
+    anchors = patch.contact_anchors(result, patch_a, patch_b, NORMAL)
+    if not anchors:
+        problems.append("交集非空但一个锚点都没留下")
+    if len(anchors) > patch.MAX_CONTACT_POINTS:
+        problems.append(f"{len(anchors)} 点，超过上限 {patch.MAX_CONTACT_POINTS}")
     outside = [
         (round(anchor.position[0], 4), round(anchor.position[1], 4))
         for anchor in anchors
@@ -138,7 +141,7 @@ def test_projected_kind_wins() -> tuple[bool, str]:
         # 线段 y ∈ [-1, 1] 被盒面裁成 y ∈ [-0.5, 0.5]，长度 1
         if abs(span - 1.0) > 1e-9:
             problems.append(f"线段长度={span:.6f}，应为 1.0")
-    anchors = patch.lift_anchors(result, line_like, patch_b, NORMAL)
+    anchors = patch.contact_anchors(result, line_like, patch_b, NORMAL)
     if len(anchors) != 2:
         problems.append(f"{len(anchors)} 个锚点")
     elif max(abs(anchor.penetration - 0.5) for anchor in anchors) > 1e-9:
@@ -149,13 +152,15 @@ def test_projected_kind_wins() -> tuple[bool, str]:
 
 
 def test_swap_matches() -> tuple[bool, str]:
-    """交换 A/B：交集点集一致，锚点位置一致（法向由调用方取反）。"""
+    """交换 A/B：交集点集一致，锚点位置一致（法向同时取反，与 GJK 一致）。"""
     cylinder, box = _scene()
     patch_a = patch.contact_patch_world(cylinder, NORMAL)
     patch_b = patch.contact_patch_world(box, _OPPOSITE)
-    forward = patch.lift_anchors(patch.overlap(patch_a, patch_b, NORMAL), patch_a, patch_b, NORMAL)
-    backward = patch.lift_anchors(
-        patch.overlap(patch_b, patch_a, NORMAL), patch_b, patch_a, NORMAL
+    forward = patch.contact_anchors(
+        patch.overlap(patch_a, patch_b, NORMAL), patch_a, patch_b, NORMAL
+    )
+    backward = patch.contact_anchors(
+        patch.overlap(patch_b, patch_a, _OPPOSITE), patch_b, patch_a, _OPPOSITE
     )
 
     problems = []
@@ -220,7 +225,7 @@ def test_empty_overlap_reasons() -> tuple[bool, str]:
         problems.append(f"分离：points={disjoint.points}, reason={disjoint.empty_reason}")
     if missing.points or missing.empty_reason != "missing_patch":
         problems.append(f"缺 patch：points={missing.points}, reason={missing.empty_reason}")
-    if patch.lift_anchors(disjoint, patch_a, patch_b, NORMAL):
+    if patch.contact_anchors(disjoint, patch_a, patch_b, NORMAL):
         problems.append("空交集仍然产生了锚点")
 
     return not problems, ("；".join(problems) if problems else
@@ -275,6 +280,119 @@ def test_contact_segment_budget() -> tuple[bool, str]:
                           f"{len(fine_patch.vertices)} 边")
 
 
+def test_tilted_cap_per_point_depth() -> tuple[bool, str]:
+    """倾斜 2° 的端面：深度必须按**真实端面**逐点算，高侧不给穿透约束。
+
+    这是端面选取容差（约 3°）的直接后果：patch 交出的是一整片**倾斜**圆盘，
+    而旧实现用"垂直于碰撞法向的平均平面"算深度，于是整片共用一个值。半径 0.3 m
+    倾斜 2° 时端面高度在边缘处差 ``0.3·sin2° ≈ 10.5 mm``：低侧少报一半，高侧
+    把本已分离的点也建了约束（实测四点都报 9.70 mm，真实是 20.16 mm / −0.77 mm）。
+    """
+    radius, height = 0.3, 1.0
+    angle = math.radians(2.0)
+    orientation = quat.quat_from_axis_angle((1.0, 0.0, 0.0), angle)
+    box_top = 0.4
+    cap_center_z = box_top - 0.0097          # 端面中心嵌入 9.7 mm
+    position_z = cap_center_z + 0.5 * height * math.cos(angle)
+    cylinder = RigidBody(
+        name="cylinder",
+        geometry=CylinderGeometry(radius, height),
+        mass=1.0,
+        position=(0.0, 0.0, position_z),
+        orientation=orientation,
+    )
+    box = RigidBody(
+        name="box",
+        geometry=BoxGeometry((2.0, 2.0, 0.8)),
+        mass=1.0,
+        position=(0.0, 0.0, 0.0),
+    )
+    contacts = gjk.collide(cylinder, box)
+
+    axis = quat.quat_rotate_vector(orientation, (0.0, 0.0, 1.0))
+    cap_center = (
+        cylinder.position[0] - axis[0] * 0.5 * height,
+        cylinder.position[1] - axis[1] * 0.5 * height,
+        cylinder.position[2] - axis[2] * 0.5 * height,
+    )
+
+    def true_penetration(point) -> float:
+        """该点正下方端面与盒顶之间的嵌入量（负值表示分离）。"""
+        offset = (
+            point.position[0] - cap_center[0],
+            point.position[1] - cap_center[1],
+            point.position[2] - cap_center[2],
+        )
+        along = sum(offset[i] * axis[i] for i in range(3))
+        surface_z = point.position[2] - along / axis[2]
+        return box_top - surface_z
+
+    problems = []
+    if not contacts:
+        return False, "没有产生接触点"
+    for point in contacts:
+        expected = true_penetration(point)
+        if abs(point.penetration - expected) > 1e-6:
+            problems.append(
+                f"x={point.position[0]:.4f} y={point.position[1]:.4f}："
+                f"报 {point.penetration * 1e3:.3f} mm，真实 {expected * 1e3:.3f} mm"
+            )
+        if expected < -1e-9:
+            problems.append(
+                f"y={point.position[1]:.4f} 处已分离 {(-expected) * 1e3:.3f} mm，"
+                f"不该建立约束"
+            )
+    deepest = max(true_penetration(point) for point in contacts)
+    if abs(deepest - 0.0202) > 5e-4:
+        problems.append(f"最深点 {deepest * 1e3:.3f} mm，应约 20.2 mm")
+
+    return not problems, ("；".join(problems) if problems else
+                          f"{len(contacts)} 点，深度 "
+                          f"{min(true_penetration(p) for p in contacts) * 1e3:.3f}"
+                          f"–{deepest * 1e3:.3f} mm（都 ≥ 0）")
+
+
+def test_near_edge_swap_keeps_position() -> tuple[bool, str]:
+    """近边缘搭接（切向重叠 1e-5 m）：交换 A/B 后即使在回退路径上，也不能偏到角上。
+
+    旧回退自己查两侧支撑点再取中点。平面上有一整片等价支撑点时，两次查询可能
+    挑到相距很远的两个点：实测交换后给出 ``y = −0.250 m`` 的单点，而真实接触在
+    ``y ≈ 0``——0.25 m 的力臂足以改变冲量分布。现在回退用 ``distance()`` 留下的
+    成对见证点，两者本来就重合在接触位置上。
+    """
+    cylinder = RigidBody(
+        name="cylinder", geometry=CylinderGeometry(1.0, 1.0), mass=1.0
+    )
+    box = RigidBody(
+        name="box",
+        geometry=BoxGeometry((1.0, 1.0, 1.0)),
+        mass=1.0,
+        position=(1.49999, 0.0, 0.9),
+    )
+    forward = gjk.collide(cylinder, box)
+    patch.reset_fallback_count()
+    backward = gjk.collide(box, cylinder)
+    reasons = patch.fallback_reasons()
+
+    problems = []
+    for label, points in (("正向", forward), ("反向", backward)):
+        if not points:
+            problems.append(f"{label}没有接触点")
+            continue
+        for point in points:
+            if abs(point.position[0] - 1.0) > 1e-3:
+                problems.append(f"{label}：x={point.position[0]:.5f}，应在 1.0 附近")
+            if abs(point.position[1]) > 0.02:
+                problems.append(f"{label}：y={point.position[1]:.5f}，偏离接触区")
+    unknown = set(reasons) - {"disjoint", "missing_patch", "separated"}
+    if unknown:
+        problems.append(f"回退原因未分类：{unknown}")
+
+    return not problems, ("；".join(problems) if problems else
+                          f"反向 {len(backward)} 点、回退 {reasons or '0 次'}，"
+                          f"位置都在 x≈1.0、|y|≤0.02")
+
+
 CHECKS = [
     ("1. P0-1 场景的交集落在搭接带内", test_overlap_in_p01_scene),
     ("2. 退化类别以投影结果为准", test_projected_kind_wins),
@@ -283,6 +401,8 @@ CHECKS = [
     ("5. 空交集的原因可区分", test_empty_overlap_reasons),
     ("6. 标签一对一分配", test_match_tags_unique),
     ("7. 接触路径的边数预算", test_contact_segment_budget),
+    ("8. 倾斜端面逐点深度、高侧不建约束", test_tilted_cap_per_point_depth),
+    ("9. 近边缘交换后回退不偏力臂", test_near_edge_swap_keeps_position),
 ]
 
 

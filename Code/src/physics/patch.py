@@ -49,37 +49,43 @@ MAX_CONTACT_POINTS = 4
 #: 交集判定容差（米）。投影后坐标已经在"接触点附近"，所以这个量级足够。
 _OVERLAP_EPS = 1e-9
 
-#: 空交集退化成单点的次数。用于观测"离散误差导致的回退"是否频繁，
-#: 它非零不代表出错，但突然变大说明边数上限或容差需要复查。
-_fallback_count = 0
+#: 空交集退化成单点的**原因计数**。非零不代表出错（离散误差、窄搭接都会触发），
+#: 但某一种原因突然变大，说明对应的环节需要复查：``"disjoint"`` 变多通常是边数
+#: 上限或容差，``"separated"`` 变多则说明法向/深度与 patch 不自洽。
+_fallback_reasons: dict[str, int] = {}
 
 
 def fallback_count() -> int:
     """到目前为止，有多少次因为切向交集为空而退化成单点。"""
-    return _fallback_count
+    return sum(_fallback_reasons.values())
+
+
+def fallback_reasons() -> dict[str, int]:
+    """按原因分类的回退次数（``disjoint`` / ``missing_patch`` / ``separated``）。"""
+    return dict(_fallback_reasons)
 
 
 def reset_fallback_count() -> None:
     """清零计数（测试用）。"""
-    global _fallback_count
-    _fallback_count = 0
+    _fallback_reasons.clear()
 
 
-def note_fallback() -> None:
-    """记录一次单点回退。"""
-    global _fallback_count
-    _fallback_count += 1
+def note_fallback(reason: str = "unknown") -> None:
+    """记录一次单点回退及其原因。"""
+    _fallback_reasons[reason] = _fallback_reasons.get(reason, 0) + 1
 
 
 @dataclass
 class PatchOverlap:
-    """两侧支撑 patch 在切平面上的交集。
+    """两侧支撑 patch 在切平面上的交集（**完整**交集，未稀疏）。
 
     属性
     ----
     points : list[tuple[float, float]]
-        交集中的点，二维（``origin + x·u + y·v`` 即世界坐标）。已经稀疏到
-        :data:`MAX_CONTACT_POINTS` 以内；空列表表示没有交叠。
+        交集多边形的顶点，二维（``origin + x·u + y·v`` 即世界坐标）。空列表表示
+        没有交叠。稀疏到 4 点是下一步（:func:`contact_anchors`）的事——必须先按
+        真实表面算出每点的间隙，否则倾斜端面上"本已分离"的点会在缩减时被当成
+        候选，甚至挤掉真正接触的点。
     origin : tuple[float, float, float]
         投影原点（世界坐标），两侧质心的中点。
     u, v : tuple[float, float, float]
@@ -114,11 +120,11 @@ def contact_patch_world(body, direction) -> SupportPatch:
 
 
 def overlap(patch_a: SupportPatch, patch_b: SupportPatch, normal) -> PatchOverlap:
-    """两侧 patch 在法向 ``normal`` 的切平面上的交集。
+    """两侧 patch 在法向 ``normal`` 的切平面上的交集（不稀疏）。
 
     ``normal`` 必须是从 A 指向 B 的单位向量；两侧 patch 应分别是沿 ``normal`` /
-    ``-normal`` 取到的支撑集。返回的点已稀疏到 4 点以内，顺序按 ``(x, y)`` 排序，
-    因此交换 A/B 得到的是同一组点（``test_poly2d`` 的第 12 项守着这条性质）。
+    ``-normal`` 取到的支撑集。求交在规范化（逆时针）坐标下进行，因此交换 A/B
+    得到同一个多边形（``test_patch`` 的第 3 项守着这条性质）。
     """
     u, v = poly2d.tangent_basis(normal)
     if not patch_a.vertices or not patch_b.vertices:
@@ -128,8 +134,7 @@ def overlap(patch_a: SupportPatch, patch_b: SupportPatch, normal) -> PatchOverla
     flat_a = poly2d.project(patch_a.vertices, u, v, origin)
     flat_b = poly2d.project(patch_b.vertices, u, v, origin)
     points = poly2d.convex_intersection(flat_a, flat_b, _OVERLAP_EPS)
-    reduced = reduce_to_four(points)
-    return PatchOverlap(reduced, origin, u, v, None if reduced else "disjoint")
+    return PatchOverlap(points, origin, u, v, None if points else "disjoint")
 
 
 def reduce_to_four(points: list[tuple[float, float]]) -> list[tuple[float, float]]:
@@ -216,38 +221,55 @@ def _ray_to_boundary(center, direction, polygon):
     return (center[0] + best * direction[0], center[1] + best * direction[1])
 
 
-def lift_anchors(
+def contact_anchors(
     patch_overlap: PatchOverlap,
     patch_a: SupportPatch,
     patch_b: SupportPatch,
     normal,
 ) -> list[Anchor]:
-    """把交集点抬回三维，投到两侧支撑平面上，得到锚点、位置与深度。
+    """交集 → 按**真实表面**逐点算间隙、裁掉分离点 → 稀疏到 ≤4 点 → 抬成锚点。
 
-    支撑集天然是平面的：沿 ``normal`` 的支撑点都满足 ``x·n = h(n)``。所以两侧
-    各自有一张垂直于 ``n`` 的平面，深度就是两张平面之间的距离——同一流形里
-    每个点相同。逐点计算（而不是直接用 EPA 的全局深度）是为了让"点确实落在
-    两侧表面上"这件事由构造保证，而不是靠外部传参。
+    为什么不能"先把交集缩到 4 点，再用一张垂直于 ``normal`` 的平面算深度"
+    ------------------------------------------------------------------
+    ``support_patch_world`` 对端面留了约 3° 的容差（这是为了不让求解器几毫弧度的
+    抖动把 4 点流形塌成 1 点），于是在倾斜端面上，patch 是**整片倾斜的圆盘**，
+    而垂直于 ``normal`` 的平均平面并不在物体表面上：半径 0.3 m 的圆柱倾斜 2° 时，
+    那个平面与真实端面在边缘处差 ``0.3·sin2° ≈ 10.5 mm``。
+
+    后果是双向的：低侧少报深度、高侧给**本已分离**的点建立约束（实测四点都报
+    ``9.70 mm``，真实值是 ``20.16 mm`` 与 ``−0.77 mm``）。凭空多出来的支撑点会
+    改变力矩，看起来像"该倒的不倒"。
+
+    所以间隙用两侧 patch **各自的拟合平面**（倾斜端面就是端面本身，平面件就是
+    面本身）与法向直线的交点来算，并且**先裁掉间隙为负的点再稀疏**——否则高侧
+    的点可能在射线取极值时把低侧的点挤下去。
     """
     if not patch_overlap.points:
         return []
 
-    plane_a = _plane_offset(patch_a.vertices, normal)
-    plane_b = _plane_offset(patch_b.vertices, normal)
-    origin = patch_overlap.origin
-    u, v = patch_overlap.u, patch_overlap.v
+    plane_a = _patch_plane(patch_a, normal)
+    plane_b = _patch_plane(patch_b, normal)
+    gradient_u, gradient_v, base = _gap_field(patch_overlap, plane_a, plane_b, normal)
+    values = [
+        gradient_u * point[0] + gradient_v * point[1] + base
+        for point in patch_overlap.points
+    ]
 
+    # 间隙是切平面上的一次函数，所以"≥0"这条约束可以在二维里精确裁剪，
+    # 而不是只丢掉负值顶点（那会漏掉边界上的插值点）。
+    candidates = _clip_positive(patch_overlap.points, values)
+    if not candidates:
+        return []
+
+    selected = reduce_to_four(candidates)
     anchors: list[Anchor] = []
-    for x, y in patch_overlap.points:
-        world = (
-            origin[0] + x * u[0] + y * v[0],
-            origin[1] + x * u[1] + y * v[1],
-            origin[2] + x * u[2] + y * v[2],
-        )
-        along = vec3.dot(world, normal)
-        anchor_a = vec3.madd(world, normal, plane_a - along)
-        anchor_b = vec3.madd(world, normal, plane_b - along)
-        penetration = vec3.dot(vec3.sub(anchor_a, anchor_b), normal)
+    for x, y in selected:
+        world = _to_world(x, y, patch_overlap)
+        anchor_a = _project_to_plane(world, plane_a, normal)
+        anchor_b = _project_to_plane(world, plane_b, normal)
+        # 裁剪线（间隙=0）上的点重新投影后可能差 -1e-17 m：夹到 0，
+        # 既避免 ContactPoint 的"深度必须非负"检查，也符合"相切"的物理含义。
+        penetration = max(0.0, vec3.dot(vec3.sub(anchor_a, anchor_b), normal))
         anchors.append(
             Anchor(
                 position=_midpoint(anchor_a, anchor_b),
@@ -256,6 +278,102 @@ def lift_anchors(
             )
         )
     return anchors
+
+
+def _patch_plane(patch: SupportPatch, normal) -> tuple[tuple, float]:
+    """patch 所在表面的平面：``(单位法向, 偏移)``。
+
+    - 多边形（端面圆盘、盒面、凸包面）：顶点共面，用 Newell 法向拟合，法向与外
+      ``normal`` 同向（只是为了可读，平面本身与符号无关）；
+    - 点 / 线段（严格凸体的支撑点、圆柱侧面的母线）：没有唯一的表面平面，退回
+      "垂直于 ``normal``、过顶点均值"的那张平面——这正是旧行为，也是这类接触
+      唯一合理的近似。
+    """
+    vertices = patch.vertices
+    if len(vertices) >= 3:
+        nx = ny = nz = 0.0
+        count = len(vertices)
+        for index in range(count):
+            first = vertices[index]
+            second = vertices[(index + 1) % count]
+            nx += (first[1] - second[1]) * (first[2] + second[2])
+            ny += (first[2] - second[2]) * (first[0] + second[0])
+            nz += (first[0] - second[0]) * (first[1] + second[1])
+        length = math.sqrt(nx * nx + ny * ny + nz * nz)
+        if length > 1e-12:
+            plane_normal = (nx / length, ny / length, nz / length)
+            if vec3.dot(plane_normal, normal) < 0.0:
+                plane_normal = (-plane_normal[0], -plane_normal[1], -plane_normal[2])
+            return plane_normal, _plane_offset(vertices, plane_normal)
+    return tuple(normal), _plane_offset(vertices, normal)
+
+
+def _project_to_plane(world, plane, normal) -> tuple:
+    """把世界点沿 ``normal`` 推到平面上（平面与 normal 平行时退回平均偏移）。"""
+    plane_normal, offset = plane
+    denominator = vec3.dot(normal, plane_normal)
+    if abs(denominator) <= 1e-9:
+        # 平面与法向平行：没有交点，退回旧的"垂直平面"近似
+        return vec3.madd(world, normal, offset - vec3.dot(world, normal))
+    return vec3.madd(
+        world, normal, (offset - vec3.dot(world, plane_normal)) / denominator
+    )
+
+
+def _gap_at(point, patch_overlap: PatchOverlap, plane_a, plane_b, normal) -> float:
+    """切平面上一点处的法向间隙（正值表示嵌入）。"""
+    world = _to_world(point[0], point[1], patch_overlap)
+    anchor_a = _project_to_plane(world, plane_a, normal)
+    anchor_b = _project_to_plane(world, plane_b, normal)
+    return vec3.dot(vec3.sub(anchor_a, anchor_b), normal)
+
+
+def _gap_field(patch_overlap: PatchOverlap, plane_a, plane_b, normal):
+    """间隙在切平面坐标上的**一次函数**系数：``gap(x, y) = a·x + b·y + c``。
+
+    两侧平面固定，投影是线性映射，所以间隙必定是仿射函数。用三个点定出系数后
+    逐顶点求值，比每个顶点都做两次"点 → 平面"投影便宜一个量级（55 边形时从
+    110 次投影降到 6 次）。
+    """
+    base = _gap_at((0.0, 0.0), patch_overlap, plane_a, plane_b, normal)
+    along_u = _gap_at((1.0, 0.0), patch_overlap, plane_a, plane_b, normal) - base
+    along_v = _gap_at((0.0, 1.0), patch_overlap, plane_a, plane_b, normal) - base
+    return along_u, along_v, base
+
+
+def _clip_positive(points: list[tuple[float, float]], values: list[float]):
+    """按 ``values >= 0`` 裁剪凸多边形（Sutherland–Hodgman 的标量版）。"""
+    count = len(points)
+    output: list[tuple[float, float]] = []
+    for index in range(count):
+        current = points[index]
+        following = points[(index + 1) % count]
+        current_value = values[index]
+        following_value = values[(index + 1) % count]
+        if current_value >= 0.0:
+            output.append(current)
+        if (current_value > 0.0 and following_value < 0.0) or (
+            current_value < 0.0 and following_value > 0.0
+        ):
+            t = current_value / (current_value - following_value)
+            output.append(
+                (
+                    current[0] + t * (following[0] - current[0]),
+                    current[1] + t * (following[1] - current[1]),
+                )
+            )
+    return output
+
+
+def _to_world(x: float, y: float, patch_overlap: PatchOverlap) -> tuple:
+    """切平面二维坐标 → 世界坐标。"""
+    origin = patch_overlap.origin
+    u, v = patch_overlap.u, patch_overlap.v
+    return (
+        origin[0] + x * u[0] + y * v[0],
+        origin[1] + x * u[1] + y * v[1],
+        origin[2] + x * u[2] + y * v[2],
+    )
 
 
 def match_tags(

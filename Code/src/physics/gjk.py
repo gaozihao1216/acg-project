@@ -686,7 +686,7 @@ def _refine_normal(body_a, body_b, normal):
 
 def collide(body_a, body_b) -> list[ContactPoint]:
     """任意两个凸体之间的接触点列表（法向 A→B），无接触时返回空列表。"""
-    gap, _point_a, _point_b, simplex = distance(body_a, body_b)
+    gap, point_a, point_b, simplex = distance(body_a, body_b)
     if gap > _GJK_TOL:
         return []
 
@@ -697,10 +697,10 @@ def collide(body_a, body_b) -> list[ContactPoint]:
     if depth <= 0.0:
         return []
 
-    return _build_manifold(body_a, body_b, normal, depth)
+    return _build_manifold(body_a, body_b, normal, depth, (point_a, point_b))
 
 
-def _build_manifold(body_a, body_b, normal, depth) -> list[ContactPoint]:
+def _build_manifold(body_a, body_b, normal, depth, witnesses=None) -> list[ContactPoint]:
     """由法向 + 深度生成接触点：**在切平面上求两侧支撑集的交集**。
 
     为什么不再用"最近采样点配对"
@@ -714,36 +714,40 @@ def _build_manifold(body_a, body_b, normal, depth) -> list[ContactPoint]:
 
     1. 两侧各取高密度支撑 patch（``patch.contact_patch_world``，圆盘最多 64 边）；
     2. 投影到法向的切平面，求两个二维凸点集的交集（``poly2d.convex_intersection``）；
-    3. 交集稀疏到 ≤4 点，且优先取两个方向的极值点；
-    4. 每个点抬回三维、投到两侧**各自的支撑平面**上，取中点与法向间隙。
+    3. 按两侧**各自拟合出的表面平面**逐点算间隙，把分离点裁掉；
+    4. 剩下的交集稀疏到 ≤4 点，再抬成两侧锚点、取中点。
 
-    深度为什么是"逐点算但数值相同"：支撑集按定义整片落在 ``x·n = h(n)`` 上，
-    所以两侧锚点的法向间距对每个点都一样。旧实现逐点算是因为它的点并不都在
-    支撑集里（倾斜时会被裁剪），这一点现在由构造保证。
+    为什么第 3 步必须在稀疏之前：端面选取留了约 3° 容差，倾斜端面会把整片倾斜
+    圆盘交给这一层；先缩到 4 点再用"垂直于法向的平均平面"算深度，会给高侧本已
+    分离的点建立约束（实测 0.3 m 圆柱倾斜 2°：四点都报 9.70 mm，真实是
+    20.16 mm / −0.77 mm）。细节见 ``patch.contact_anchors``。
 
     空交集时不回退到旧采样
     ----------------------
     GJK 认为接触、但离散后的两个多边形切向不相交（圆盘内接多边形比真实圆盘小
-    一圈），这时退化成**单点**：两侧支撑点的中点。那个点由支撑对决定，不可能落在
-    两侧区域之外；同时记一次 ``patch.note_fallback()``，便于观测回退频率。
+    一圈）时，退化成**单点**。这个点用 ``distance()`` 留下的**成对见证点**的中点：
+    ``point_a − point_b ≈ 0``，两点本来就重合在接触位置，力臂不会偏。
+
+    早先这里自己查了两侧支撑点再取中点，平面上有一整片等价支撑点时查询可能挑到
+    远离接触区的角点——实测近边缘搭接（盒心 x=1.49999）交换 A/B 后退化成
+    ``y = −0.250 m`` 的单点，而真实接触在 ``y ≈ 0``。见证点没有这个问题，因为
+    它们不是各查各的。
 
     特征 ID
     -------
     ``feature_id = tag_a * TAG_LIMIT + tag_b``，标签仍来自
-    ``support.feature_world_tagged``（0..7 的体坐标槽位），但**分配方式**改成了
-    "距离升序的贪心一对一"：两个接触点不会拿到同一个槽位，批内唯一因此由构造
-    保证，而不是靠"点少就不会撞"的运气。
+    ``support.feature_world_tagged``（0..7 的体坐标槽位），分配方式是"两侧各按
+    极角排序后逐个对齐"：批内唯一由构造保证，且微扰下不换人。
     """
     opposite = (-normal[0], -normal[1], -normal[2])
 
     patch_a = patch_module.contact_patch_world(body_a, normal)
     patch_b = patch_module.contact_patch_world(body_b, opposite)
     overlap = patch_module.overlap(patch_a, patch_b, normal)
-    anchors = patch_module.lift_anchors(overlap, patch_a, patch_b, normal)
+    anchors = patch_module.contact_anchors(overlap, patch_a, patch_b, normal)
 
-    usable = [anchor for anchor in anchors if anchor.penetration > 0.0]
-    if usable:
-        positions = [anchor.position for anchor in usable]
+    if anchors:
+        positions = [anchor.position for anchor in anchors]
         tags_a = patch_module.match_tags(
             positions, feature_world_tagged(body_a, normal), normal
         )
@@ -757,17 +761,26 @@ def _build_manifold(body_a, body_b, normal, depth) -> list[ContactPoint]:
                 penetration=anchor.penetration,
                 feature_id=tag_a * TAG_LIMIT + tag_b,
             )
-            for anchor, tag_a, tag_b in zip(usable, tags_a, tags_b)
+            for anchor, tag_a, tag_b in zip(anchors, tags_a, tags_b)
         ]
 
-    patch_module.note_fallback()
-    support_a = support_world(body_a, normal)
-    support_b = support_world(body_b, opposite)
-    position = (
-        0.5 * (support_a[0] + support_b[0]),
-        0.5 * (support_a[1] + support_b[1]),
-        0.5 * (support_a[2] + support_b[2]),
-    )
+    # 回退：优先用 GJK 留下的成对见证点（两侧同一点），它一定在接触位置上
+    patch_module.note_fallback(overlap.empty_reason or "separated")
+    if witnesses is not None:
+        point_a, point_b = witnesses
+        position = (
+            0.5 * (point_a[0] + point_b[0]),
+            0.5 * (point_a[1] + point_b[1]),
+            0.5 * (point_a[2] + point_b[2]),
+        )
+    else:
+        support_a = support_world(body_a, normal)
+        support_b = support_world(body_b, opposite)
+        position = (
+            0.5 * (support_a[0] + support_b[0]),
+            0.5 * (support_a[1] + support_b[1]),
+            0.5 * (support_a[2] + support_b[2]),
+        )
     return [
         ContactPoint(position=position, normal=normal, penetration=depth),
     ]
