@@ -35,6 +35,7 @@ from __future__ import annotations
 import math
 
 from ..mathutils import vec3
+from . import patch as patch_module
 from .contact import ContactPoint
 from .support import TAG_LIMIT, feature_world_tagged, support_world
 
@@ -59,9 +60,6 @@ _EPA_TOL = 2e-4
 
 #: 判定两个顶点重合的阈值（米），用于单纯形去重。
 _DUPLICATE_TOL = 1e-12
-
-#: 流形最多保留的接触点数，与盒-盒的流形规模保持一致。
-_MAX_MANIFOLD_POINTS = 4
 
 
 # ---------------------------------------------------------------------------
@@ -703,60 +701,68 @@ def collide(body_a, body_b) -> list[ContactPoint]:
 
 
 def _build_manifold(body_a, body_b, normal, depth) -> list[ContactPoint]:
-    """由法向 + 深度生成接触点。
+    """由法向 + 深度生成接触点：**在切平面上求两侧支撑集的交集**。
 
-    两侧都给出多点的支撑特征（面-面、线-面）时逐点配对，得到 2–4 点流形；
-    只要有一侧是单点（球、端帽、棱），就退化为 1 点。
+    为什么不再用"最近采样点配对"
+    ----------------------------
+    旧实现拿两侧的 4 点采样逐点配对、只在法向上判深度，完全不看切向覆盖。
+    0.6 m 宽的圆柱搭在盒子边上 0.2 m 时，四个 45°/135°/225°/315° 采样点里有两个
+    在盒子投影外 1.5 m、两个在投影左侧，却被当成真实接触点。更糟的是这四点关于
+    圆柱轴对称，净力矩为零——症状不是"翻倒"，而是**该倒的不倒**。
 
-    每个点的深度用"该点与对面最近特征点沿法向的投影差"单独算——
-    倾斜接触时边缘点并不该有中心点的深度，一律取全局深度会让物体被
-    "整片吸住"，表现为不该有的刚性。
+    现在的流程（P0-1）：
+
+    1. 两侧各取高密度支撑 patch（``patch.contact_patch_world``，圆盘最多 64 边）；
+    2. 投影到法向的切平面，求两个二维凸点集的交集（``poly2d.convex_intersection``）；
+    3. 交集稀疏到 ≤4 点，且优先取两个方向的极值点；
+    4. 每个点抬回三维、投到两侧**各自的支撑平面**上，取中点与法向间隙。
+
+    深度为什么是"逐点算但数值相同"：支撑集按定义整片落在 ``x·n = h(n)`` 上，
+    所以两侧锚点的法向间距对每个点都一样。旧实现逐点算是因为它的点并不都在
+    支撑集里（倾斜时会被裁剪），这一点现在由构造保证。
+
+    空交集时不回退到旧采样
+    ----------------------
+    GJK 认为接触、但离散后的两个多边形切向不相交（圆盘内接多边形比真实圆盘小
+    一圈），这时退化成**单点**：两侧支撑点的中点。那个点由支撑对决定，不可能落在
+    两侧区域之外；同时记一次 ``patch.note_fallback()``，便于观测回退频率。
 
     特征 ID
     -------
-    ``feature_id = tag_a * TAG_LIMIT + tag_b``，两侧标签都来自
-    ``support.feature_world_tagged``，由**几何特征**决定（盒的顶点序号、端面圆周
-    序号、母线端点序号），与"点在列表里的第几个"无关。
-
-    为什么不能用 ``enumerate`` 的下标：这条流形接着会按深度排序再截断（见末尾的
-    ``sort`` + ``del``），而倾斜时点的个数本身也会变。下标于是每帧都在漂移，
-    暖启动会把上一帧某个角上的冲量喂到另一个角——症状是静置物体缓慢自旋，
-    且只在偏心负载下才看得出来。
+    ``feature_id = tag_a * TAG_LIMIT + tag_b``，标签仍来自
+    ``support.feature_world_tagged``（0..7 的体坐标槽位），但**分配方式**改成了
+    "距离升序的贪心一对一"：两个接触点不会拿到同一个槽位，批内唯一因此由构造
+    保证，而不是靠"点少就不会撞"的运气。
     """
-    feature_a = feature_world_tagged(body_a, normal)
-    feature_b = feature_world_tagged(body_b, (-normal[0], -normal[1], -normal[2]))
+    opposite = (-normal[0], -normal[1], -normal[2])
 
-    if len(feature_a) > 1 and len(feature_b) > 1:
-        points: list[ContactPoint] = []
-        for point, tag_a in feature_a:
-            nearest, tag_b = min(
-                feature_b,
-                key=lambda other: (
-                    (point[0] - other[0][0]) ** 2
-                    + (point[1] - other[0][1]) ** 2
-                    + (point[2] - other[0][2]) ** 2
-                ),
-            )
-            offset = vec3.sub(point, nearest)
-            point_depth = vec3.dot(offset, normal)
-            if point_depth <= 0.0:
-                continue
-            points.append(
-                ContactPoint(
-                    position=vec3.madd(point, normal, -0.5 * point_depth),
-                    normal=normal,
-                    penetration=point_depth,
-                    feature_id=tag_a * TAG_LIMIT + tag_b,
-                )
-            )
-        if points:
-            points.sort(key=lambda item: item.penetration, reverse=True)
-            del points[_MAX_MANIFOLD_POINTS:]
-            return points
+    patch_a = patch_module.contact_patch_world(body_a, normal)
+    patch_b = patch_module.contact_patch_world(body_b, opposite)
+    overlap = patch_module.overlap(patch_a, patch_b, normal)
+    anchors = patch_module.lift_anchors(overlap, patch_a, patch_b, normal)
 
-    # 单点：两侧支撑点的中点，与球-球/球-盒的取法一致
+    usable = [anchor for anchor in anchors if anchor.penetration > 0.0]
+    if usable:
+        positions = [anchor.position for anchor in usable]
+        tags_a = patch_module.match_tags(
+            positions, feature_world_tagged(body_a, normal), normal
+        )
+        tags_b = patch_module.match_tags(
+            positions, feature_world_tagged(body_b, opposite), normal
+        )
+        return [
+            ContactPoint(
+                position=anchor.position,
+                normal=normal,
+                penetration=anchor.penetration,
+                feature_id=tag_a * TAG_LIMIT + tag_b,
+            )
+            for anchor, tag_a, tag_b in zip(usable, tags_a, tags_b)
+        ]
+
+    patch_module.note_fallback()
     support_a = support_world(body_a, normal)
-    support_b = support_world(body_b, (-normal[0], -normal[1], -normal[2]))
+    support_b = support_world(body_b, opposite)
     position = (
         0.5 * (support_a[0] + support_b[0]),
         0.5 * (support_a[1] + support_b[1]),

@@ -190,13 +190,19 @@ def test_gjk_manifold_ids_unique() -> tuple[bool, str]:
 # ---------------------------------------------------------------------------
 
 def test_gjk_ids_stable_under_axis_spin() -> tuple[bool, str]:
-    """柱体绕**自身轴**自转后，接触点的 ID 与位置配对一致。
+    """柱体微小倾斜后，接触点的位置与 ID 都稳定。
 
-    这条只证明一个具体情形：轴在世界空间不动，于是圆周采样基也不动，采样槽位
-    随体一起转，标签自然跟上。
+    P0-1 之后接触点来自切平面交集，位置不再等于圆周槽位本身，所以"位置稳定"和
+    "标签稳定"必须分别保证：
 
-    它**不**证明倾斜稳定，更不证明跨越基底分界时稳定——那两件当前做不到，
-    见第 8 项与 ``contact.py`` 里"跨帧稳定 = best effort"的措辞。
+    - 位置取自交集**边界上的插值点**（从交集重心沿 ±x/±y 射出），不是多边形的
+      极值顶点。否则物体转一点点，极值换到相邻顶点，位置会跳一个**顶点间距**
+      （半径 0.3 m、55 边形时实测 1.7 cm；改成射线插值后 1.3e-5 m）。
+    - 标签按"两侧各自按极角排序后逐个对齐"分配，不用"取最近槽位"（那种做法在
+      极点落在两个槽位中垂线上时会随扰动整体轮转一位）。
+
+    这里断言逐点配对也成立，比"集合相同"更强；若将来改成别的稀疏策略，这条会
+    先红，逼着回头检查上面两条性质。
     """
     base = make_body(CylinderGeometry(0.3, 0.8), 0.45)
     box = RigidBody(
@@ -217,6 +223,7 @@ def test_gjk_ids_stable_under_axis_spin() -> tuple[bool, str]:
     )
     after = _collide_points(turned, box)
 
+    worst = 0.0
     mismatches = 0
     for point in before:
         nearest = min(
@@ -225,13 +232,26 @@ def test_gjk_ids_stable_under_axis_spin() -> tuple[bool, str]:
                 (point.position[axis] - other.position[axis]) ** 2 for axis in range(3)
             ),
         )
+        worst = max(
+            worst,
+            math.sqrt(
+                sum((point.position[axis] - nearest.position[axis]) ** 2 for axis in range(3))
+            ),
+        )
         if nearest.feature_id != point.feature_id:
             mismatches += 1
 
-    ok = len(after) == len(before) and mismatches == 0
+    ids = _ids(after)
+    ok = (
+        len(after) == len(before)
+        and worst <= 1e-4
+        and mismatches == 0
+        and len(ids) == len(set(ids))
+    )
     return ok, (
-        f"扰动 {math.degrees(angle):.3f}°：前 {len(before)} 点 / 后 {len(after)} 点，"
-        f"按位置配对后 ID 不一致的点数={mismatches}"
+        f"扰动 {math.degrees(angle):.3f}°：前 {len(before)} 点 / 后 {len(after)} 点；"
+        f"位置最大位移={worst:.2e} m；逐点 ID 不一致={mismatches}；唯一="
+        f"{len(ids) == len(set(ids))}"
     )
 
 
