@@ -1,83 +1,26 @@
 # -*- coding: utf-8 -*-
-"""顺序冲量（sequential impulse）接触求解器。
+"""顺序冲量速度求解与独立的 split-impulse 几何纠正。
 
-这是整个刚体引擎的**核心**，也是最难写对的部分。它不求解线性方程组，
-而是反复"逐个接触点施加冲量并修正速度"，迭代若干次逼近满足所有约束的
-速度场。优点是极其简单、天然支持多接触、容易加摩擦与限幅。
+速度层：法向累积冲量非负，恢复系数只在足够大的接近速度下启用；切向采用
+二维有效质量谱界控制的投影梯度，把累积冲量投影到库仑摩擦圆盘。
+几何层：每个完整子步结束后，独立求解虚拟速度以减少超出 slop 的穿透。
+虚拟冲量不进入真实线速度、世界角动量或暖启动缓存。
 
-一次求解做的事情
-----------------
-对每个接触点，把它看成一条**速度非穿透约束**：
-
-    目标：接触点的法向相对速度 ≥ 0（不允许继续靠近）
-
-用累积冲量 ``P`` 迭代修正：
-
-    vn = 接触点法向相对速度
-    dj = (vn_target - vn) / K        # K 是该方向的"有效质量"倒数
-    P_new = max(0, P + dj)           # 单侧约束：只能推、不能拉
-    apply(P_new - P)
-
-"只能推不能拉"正是 `max(0, ...)` 的含义。如果漏掉这个限幅，物体会被
-"粘"在一起互相吸引——这是最常见的症状。
-
-四个关键参数
-------------
-恢复系数 restitution
-    碰撞后法向速度反向的比例。只在**接近速度足够大**时启用，
-    否则静置物体会无限微弹（见 ``restitution_threshold``）。
-
-摩擦 friction
-    切向冲量上限为 ``mu * P_normal``（库仑锥的近似）。求解器里对两个
-    正交切向分别限幅，而不是严格解摩擦锥——这是所有实时引擎的通行简化。
-
-Baumgarte 系数
-    穿透不会被速度约束直接修正（速度约束只管"别再深入"），所以需要
-    额外给一个**分离速度**把物体推出来：``beta/h * (penetration - slop)``。
-    太大会产生"弹跳感"，太小会持续下陷。
-
-slop（穿透容差）
-    允许保留一点穿透不去修正。没有它，静置物体会被反复推开又落下，
-    表现为持续的高频抖动。
-
-为什么必须先捕获初始法向速度
-----------------------------
-恢复系数要基于**碰撞前**的接近速度，而不是迭代过程中的瞬时速度。
-如果每次迭代都用当前速度乘恢复系数，能量会被反复注入，物体会越弹越高。
-
-暖启动（warm starting）
------------------------
-静置的接触每帧的冲量几乎不变（就是支撑重力的那点冲量）。冷启动意味着每帧都从
-``P = 0`` 开始，迭代只能一点点把冲量"爬"上去——接触越多、链越长，爬得越慢，
-这正是"少迭代时堆叠发软、持续下陷"的直接原因。
-
-暖启动把上一帧的累积冲量直接作为初值施加一遍，于是迭代只需要修正**变化量**。
-代价是必须能跨帧认出"同一个接触点"，这就是 ``ContactPoint.feature_id`` 存在的
-理由：按数组下标匹配，一旦流形点数变化就会把冲量喂错对象。
-
-两个实现上的坑：
-
-1. **只暖启动法向，不暖启动切向**。这一条是实测结论，不是省事：把切向冲量也
-   缓存并复用之后，3×3 宽堆在 8 次迭代下的峰值穿透从 0.63 mm 涨到 2.17 mm，
-   而只暖启动法向时是 0.35 mm（见 ``scripts/bench_warm_start.py``）。原因是
-   四点流形上每个角点的切向冲量都会产生力矩，四角互相不对称，迭代次数有限时
-   收敛不掉，反而累积成缓慢自旋与蠕移。法向冲量没有这个问题——它就是支撑重力的
-   那一份，四角同向。
-2. **同一子步内只能暖启动一次**。TOI 会把一个子步切成多段、每段各求解一次；
-   若每段都暖启动，静置接触会在同一个子步内被反复施加支撑冲量（实测棱柱落地
-   穿透 0.148 → 1.317 mm）。缓存里记了子步号，同一子步内的后续求解一律冷启动。
-3. **法向冲量在两帧之间会微转**，所以缓存的是标量、施加时沿**当前**法向——
-   不缓存冲量向量，也就不存在"把旧基下的分量投影到新基"的问题。
-4. **Baumgarte 的偏置冲量也在缓存里**。看起来会"多推一次"，但迭代第一步就会把
-   它扣掉（推出去之后 ``vn`` 超过目标，``delta`` 为负），所以不额外处理——
-   前提是 ``iterations ≥ 1``。
+ContactManager 保存两侧局部表面锚点、法向、时间步和冲量。仅连续子步允许
+几何有效的接触暖启动，特征 ID 是提示而非身份保证；同一子步只施加一次。
+当前只缓存法向冲量。切向暖启动仍关闭，避免在未独立校准前扩大行为变化。
+历史策略实验的数据描述旧实现，不能作为当前参数下的性能数字。
 """
 
 from __future__ import annotations
 
+import math
+
 from ..mathutils import vec3
+from ..mathutils import quaternion as quat
 from .body import RigidBody
 from .contact import ContactManifold
+from .contact_cache import ContactManager, ensure_anchors
 
 
 class _Constraint:
@@ -99,11 +42,14 @@ class _Constraint:
         "normal_mass",
         "t1_mass",
         "t2_mass",
+        "t12_mass",
         "target_normal_velocity",
         "friction",
         "accumulated_normal",
         "accumulated_t1",
         "accumulated_t2",
+        "anchor_a", "anchor_b", "cache_entry", "h",
+        "bias_target", "accumulated_bias",
     )
 
     def __init__(self) -> None:
@@ -119,11 +65,16 @@ class _Constraint:
         self.normal_mass = 0.0
         self.t1_mass = 0.0
         self.t2_mass = 0.0
+        self.t12_mass = 0.0
         self.target_normal_velocity = 0.0
         self.friction = 0.0
         self.accumulated_normal = 0.0
         self.accumulated_t1 = 0.0
         self.accumulated_t2 = 0.0
+        self.anchor_a = self.anchor_b = (0.0, 0.0, 0.0)
+        self.cache_entry = None
+        self.h = 0.0
+        self.bias_target = self.accumulated_bias = 0.0
 
 
 def _effective_mass(
@@ -204,13 +155,8 @@ class SequentialImpulseSolver:
         "slop",
         "restitution_threshold",
         "warm_start",
-        "_impulse_cache",
-        "_solves",
-        "_epoch",
+        "contacts",
     )
-
-    #: 缓存里保留多少"次求解"的历史。超过这个跨度的接触点视为已分离。
-    _CACHE_KEEP = 3
 
     def __init__(
         self,
@@ -239,9 +185,7 @@ class SequentialImpulseSolver:
 
         #: 键 = (body_a 索引, body_b 索引, feature_id)
         #: 值 = (法向累积冲量, 时间戳, 子步号)
-        self._impulse_cache: dict[tuple[int, int, int], tuple[float, int, int]] = {}
-        self._solves = 0
-        self._epoch = 0
+        self.contacts = ContactManager(self.slop)
 
     # -- 预处理 -----------------------------------------------------------
 
@@ -256,6 +200,8 @@ class SequentialImpulseSolver:
            （恢复系数 + Baumgarte 修正）
         """
         constraints: list[_Constraint] = []
+        self.contacts.slop = self.slop
+        self.contacts.begin_query()
 
         for manifold in manifolds:
             body_a = get_body(manifold.body_a)
@@ -268,10 +214,13 @@ class SequentialImpulseSolver:
                 constraint.body_b = body_b
                 constraint.normal = point.normal
                 constraint.friction = manifold.friction
+                constraint.h = h
+                constraint.cache_entry = self.contacts.bind(point, constraint.key, body_a, body_b)
+                constraint.anchor_a, constraint.anchor_b = point.local_anchor_a, point.local_anchor_b
 
                 # 力臂：接触点 - 质心
-                constraint.r_a = vec3.sub(point.position, body_a.position)
-                constraint.r_b = vec3.sub(point.position, body_b.position)
+                constraint.r_a = quat.quat_rotate_vector(body_a.orientation, constraint.anchor_a)
+                constraint.r_b = quat.quat_rotate_vector(body_b.orientation, constraint.anchor_b)
 
                 # 切向基：用于把摩擦拆成两个正交方向
                 constraint.t1, constraint.t2 = vec3.orthogonal_basis(point.normal)
@@ -286,6 +235,11 @@ class SequentialImpulseSolver:
                 constraint.t2_mass = _effective_mass(
                     body_a, body_b, constraint.r_a, constraint.r_b, constraint.t2
                 )
+                constraint.t12_mass = 0.0
+                for body, r in ((body_a, constraint.r_a), (body_b, constraint.r_b)):
+                    if not body.is_static:
+                        response = vec3.cross(body.inverse_inertia_world(vec3.cross(r, constraint.t2)), r)
+                        constraint.t12_mass += vec3.dot(constraint.t1, response)
 
                 # 有效质量退化为 0 说明两侧都是静态物体，直接跳过
                 if constraint.normal_mass <= 1e-12:
@@ -303,9 +257,12 @@ class SequentialImpulseSolver:
 
                 # Baumgarte：把超出容差的穿透，按比例转成"分离速度"
                 excess = max(0.0, point.penetration - self.slop)
-                bias = self.baumgarte * excess / h
+                radii = [b.bounding_radius for b in (body_a, body_b) if b.geometry is not None]
+                correction_limit = min(.05, .2 * min(radii, default=1))
+                bias = min(self.baumgarte * excess, correction_limit) / h
 
-                constraint.target_normal_velocity = bounce + bias
+                constraint.target_normal_velocity = bounce
+                constraint.bias_target = bias
                 constraints.append(constraint)
 
         return constraints
@@ -362,34 +319,112 @@ class SequentialImpulseSolver:
 
         v_rel = _relative_velocity(body_a, body_b, constraint.r_a, constraint.r_b)
 
-        # --- 切向 1 ---
         vt1 = vec3.dot(v_rel, constraint.t1)
-        delta1 = -vt1 / constraint.t1_mass
-        new1 = constraint.accumulated_t1 + delta1
-        new1 = max(-max_friction, min(max_friction, new1))
-        applied1 = new1 - constraint.accumulated_t1
-        constraint.accumulated_t1 = new1
-        if applied1 != 0.0:
-            _apply_pair_impulse(
-                body_a, body_b, constraint.r_a, constraint.r_b,
-                vec3.scale(constraint.t1, applied1),
-            )
-
-        # --- 切向 2 ---（重新取相对速度，因为切向 1 已改变了速度）
-        v_rel = _relative_velocity(body_a, body_b, constraint.r_a, constraint.r_b)
         vt2 = vec3.dot(v_rel, constraint.t2)
-        delta2 = -vt2 / constraint.t2_mass
-        new2 = constraint.accumulated_t2 + delta2
-        new2 = max(-max_friction, min(max_friction, new2))
+        k1, k2, k12 = constraint.t1_mass, constraint.t2_mass, constraint.t12_mass
+        determinant = k1 * k2 - k12 * k12
+        if determinant <= 1e-24:
+            return
+        # 二维投影梯度：用切向 K 的最大特征值控制步长。
+        # 直接用 K^-1 再作欧氏圆盘裁剪不是 K 度量下的约束解，会使滑动方向偏转。
+        largest = .5 * (k1 + k2 + math.hypot(k1 - k2, 2 * k12))
+        new1 = constraint.accumulated_t1 - vt1 / largest
+        new2 = constraint.accumulated_t2 - vt2 / largest
+        length = math.hypot(new1, new2)
+        if length > max_friction:
+            scale = max_friction / length
+            new1 *= scale
+            new2 *= scale
+        applied1 = new1 - constraint.accumulated_t1
         applied2 = new2 - constraint.accumulated_t2
+        constraint.accumulated_t1 = new1
         constraint.accumulated_t2 = new2
-        if applied2 != 0.0:
+        if applied1 != 0.0 or applied2 != 0.0:
             _apply_pair_impulse(
                 body_a, body_b, constraint.r_a, constraint.r_b,
-                vec3.scale(constraint.t2, applied2),
+                vec3.add(vec3.scale(constraint.t1, applied1), vec3.scale(constraint.t2, applied2)),
             )
 
     # -- 暖启动 -----------------------------------------------------------
+
+    def _position_constraints(self, manifolds, get_body, h):
+        """Only prepare penetrating normal constraints; no friction or cache matching."""
+        constraints = []
+        for manifold in manifolds:
+            active = [p for p in manifold.points if p.penetration > self.slop]
+            if not active:
+                continue
+            a, b = get_body(manifold.body_a), get_body(manifold.body_b)
+            radii = [body.bounding_radius for body in (a, b) if body.geometry is not None]
+            limit = min(.05, .2 * min(radii, default=1))
+            for point in active:
+                ensure_anchors(point, a, b)
+                c = _Constraint()
+                c.body_a, c.body_b, c.normal = a, b, point.normal
+                c.r_a = quat.quat_rotate_vector(a.orientation, point.local_anchor_a)
+                c.r_b = quat.quat_rotate_vector(b.orientation, point.local_anchor_b)
+                c.normal_mass = _effective_mass(a, b, c.r_a, c.r_b, c.normal)
+                if c.normal_mass <= 1e-12:
+                    continue
+                c.bias_target = min(self.baumgarte * max(0., point.penetration - self.slop), limit) / h
+                constraints.append(c)
+        return constraints
+
+    def solve_positions(self, manifolds, get_body, h):
+        """Split impulse: virtual velocities correct overlap without changing p or L.
+
+        Called once after the complete substep, never at every TOI probe. No
+        restitution, friction or warm-start impulses participate in this solve.
+        """
+        if self.baumgarte <= 0 or not manifolds:
+            return 0
+        constraints = self._position_constraints(manifolds, get_body, h)
+        if not constraints:
+            return 0
+        pseudo = {}
+        for c in constraints:
+            for b in (c.body_a, c.body_b):
+                if not b.is_static:
+                    pseudo.setdefault(id(b), [b, (0., 0., 0.), (0., 0., 0.)])
+
+        def velocity(b, r):
+            state = pseudo.get(id(b))
+            return (0., 0., 0.) if state is None else vec3.add(state[1], vec3.cross(state[2], r))
+
+        for _ in range(max(8, self.iterations)):
+            for c in constraints:
+                vn = vec3.dot(vec3.sub(velocity(c.body_b, c.r_b), velocity(c.body_a, c.r_a)), c.normal)
+                new = max(0., c.accumulated_bias + (c.bias_target - vn) / c.normal_mass)
+                delta = new - c.accumulated_bias
+                c.accumulated_bias = new
+                for b, r, sign in ((c.body_a, c.r_a, -1), (c.body_b, c.r_b, 1)):
+                    if b.is_static:
+                        continue
+                    impulse = vec3.scale(c.normal, sign * delta)
+                    state = pseudo[id(b)]
+                    state[1] = vec3.madd(state[1], impulse, b.inv_mass)
+                    state[2] = vec3.add(state[2], b.inverse_inertia_world(vec3.cross(r, impulse)))
+        for b, v, omega in pseudo.values():
+            b.position = vec3.madd(b.position, v, h)
+            # L 固定而姿态改变仍可能抬高转动能。回溯角修正，避免几何修补注入动能。
+            # 无可接受的角修正时只保留平移纠正，不修改真实动量来补偿误差。
+            energy = .5 * vec3.dot(b.angular_momentum, b.angular_velocity)
+            amount = h
+            for _ in range(12):
+                candidate = quat.quat_integrate(b.orientation, omega, amount)
+                next_energy = .5 * vec3.dot(b.angular_momentum,
+                                           b.inverse_inertia_world(b.angular_momentum, orientation=candidate))
+                if next_energy <= energy + 1e-12 * max(1., energy):
+                    b.orientation = candidate
+                    break
+                amount *= .5
+        return len(constraints)
+
+    @property
+    def _impulse_cache(self):
+        """兼容诊断脚本的只读快照；缓存本体由 ContactManager 管理。"""
+        return {key: (e.normal_impulse, e.seen_epoch, e.warm_epoch)
+                for key, e in self.contacts.entries.items()}
 
     def reset_cache(self) -> None:
         """清空跨帧冲量缓存。
@@ -397,9 +432,7 @@ class SequentialImpulseSolver:
         场景重载、物体数量变化、或手动改写位姿之后必须调用，否则会把属于旧状态
         的冲量施加到新状态上——症状是"第一次接触时物体被莫名弹开"。
         """
-        self._impulse_cache.clear()
-        self._solves = 0
-        self._epoch = 0
+        self.contacts.clear()
 
     def begin_substep(self) -> None:
         """进入新的子步。同一个子步内允许多次求解（TOI 切分），但**只能暖启动一次**。
@@ -411,7 +444,7 @@ class SequentialImpulseSolver:
 
         所以缓存里记了"这笔冲量来自哪个子步"：同一子步内的后续求解一律冷启动。
         """
-        self._epoch += 1
+        self.contacts.begin_substep()
 
     def _warm_start_impulses(self, constraints: list[_Constraint]) -> int:
         """把上次求解的法向累积冲量沿当前法向施加，返回命中的接触点数。
@@ -419,19 +452,19 @@ class SequentialImpulseSolver:
         只处理法向：切向冲量**故意不缓存**，原因见模块文档第 1 条（四点流形的
         切向冲量会累积成力矩，迭代次数有限时收敛不掉，反而更抖）。
         """
-        if not self._impulse_cache:
+        if not self.contacts.entries:
             return 0
 
         hits = 0
         for constraint in constraints:
-            entry = self._impulse_cache.get(constraint.key)
+            entry = constraint.cache_entry
             if entry is None:
                 continue
-            impulse, _stamp, epoch = entry
-            if epoch >= self._epoch:
+            if entry.seen_epoch >= self.contacts.epoch or entry.warm_epoch == self.contacts.epoch:
                 # 同一子步内已经用过这笔冲量（TOI 把子步切成了多段），
                 # 再施加一次就是重复计费
                 continue
+            impulse = entry.normal_impulse * constraint.h / entry.h
             if impulse <= 0.0:
                 continue
 
@@ -442,29 +475,13 @@ class SequentialImpulseSolver:
                 vec3.scale(constraint.normal, impulse),
             )
             hits += 1
+            entry.warm_epoch = self.contacts.epoch
 
         return hits
 
     def _store_impulses(self, constraints: list[_Constraint]) -> None:
         """把本次求解的法向累积冲量写回缓存，并清理久未出现的键。"""
-        self._solves += 1
-        stamp = self._solves
-
-        for constraint in constraints:
-            self._impulse_cache[constraint.key] = (
-                constraint.accumulated_normal, stamp, self._epoch
-            )
-
-        # 清理：连续若干次求解都没出现的接触点视为已分离。
-        # 用"按插入序遍历 + 删除"而不是重建字典，保证顺序可复现。
-        if stamp % 16 == 0 or len(self._impulse_cache) > 4096:
-            cutoff = stamp - self._CACHE_KEEP
-            stale = [
-                key for key, (_impulse, seen, _epoch) in self._impulse_cache.items()
-                if seen < cutoff
-            ]
-            for key in stale:
-                del self._impulse_cache[key]
+        self.contacts.store(constraints, constraints[0].h)
 
     def solve(self, manifolds, get_body, h: float) -> int:
         """求解一批接触。
@@ -485,7 +502,7 @@ class SequentialImpulseSolver:
 
         if self.warm_start:
             self._warm_start_impulses(constraints)
-        elif self._impulse_cache:
+        elif self.contacts.entries:
             # 运行中把暖启动关掉时必须丢弃旧冲量，否则 A/B 对照会被残留状态污染
             self.reset_cache()
 

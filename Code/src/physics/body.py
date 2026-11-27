@@ -1,33 +1,17 @@
 # -*- coding: utf-8 -*-
-"""刚体状态与基本操作。
+"""刚体状态、世界角动量和速度响应。
 
-``RigidBody`` 保存的是**仿真状态**（位置、姿态、速度），而不是场景描述。
-场景描述（``ObjectSpec``）是只读的输入，刚体是每帧可变的输出。
-
-状态量与动量
-------------
-刚体用 6 个自由度描述：
-
-- 位置 ``position``              : 质心在世界坐标中的位置
-- 姿态 ``orientation``           : 单位四元数
-- 线速度 ``linear_velocity``     : 质心速度（世界坐标）
-- 角速度 ``angular_velocity``    : **世界坐标系**下的角速度
-
-为什么惯量存"局部对角 + 逆"
-----------------------------
-四种参数化几何都高度对称，惯量张量在**局部坐标系**下是对角阵。
-因此只需存 3 个数，世界坐标下的逆惯量作用通过
-``R · diag(1/I) · Rᵀ · v`` 现算。这样每步只多两次旋转，却省掉
-一次 3×3 矩阵求逆以及"惯量随时间漂移"的数值问题。
-
-静态物体
---------
-``is_static=True`` 时 ``inv_mass = 0``、逆惯量为零向量。
-求解器里不需要为静态物体写任何分支——所有用到 ``inv_mass`` 的地方
-乘 0 自然就"推不动"，方程形式完全统一。
+位置是世界质心；姿态采用 (w,x,y,z) 四元数；局部惯量沿主轴对角化。
+世界角动量 L 是权威旋转状态，angular_velocity 是 I_world^-1 L 的派生属性。
+设置角速度会转换为 L；碰撞施加 delta L = r cross J。自由转动通过中点姿态
+积分保持 L，角速度随姿态改变。静态体的接触点速度与惯量响应恒为零。
+add_force/add_torque 累加世界载荷，在完整 PhysicsWorld.step 的所有子步生效，
+成功完成该步后清空；直接调用 substep 的调用者负责 clear_forces。
 """
 
 from __future__ import annotations
+
+import math
 
 from ..geom.geometry import CompoundGeometry, GeometrySpec
 from ..geom.inertia import compute_inertia
@@ -45,7 +29,9 @@ class RigidBody:
         "position",
         "orientation",
         "linear_velocity",
-        "angular_velocity",
+        "angular_momentum",
+        "force",
+        "torque",
         "mass",
         "inv_mass",
         "inertia_local",
@@ -53,6 +39,8 @@ class RigidBody:
         "restitution",
         "friction",
         "is_static",
+        "_inverse_cache_key", "_inverse_cache_matrix",
+        "_support_rotation",
     )
 
     def __init__(
@@ -114,7 +102,9 @@ class RigidBody:
             self.inv_inertia_local = tuple(1.0 / v for v in self.inertia_local)
 
         self.linear_velocity = (0.0, 0.0, 0.0)
-        self.angular_velocity = (0.0, 0.0, 0.0)
+        self.angular_momentum = (0.0, 0.0, 0.0)
+        self.force = (0.0, 0.0, 0.0)
+        self.torque = (0.0, 0.0, 0.0)
 
     # -- 构造 -------------------------------------------------------------
 
@@ -136,7 +126,7 @@ class RigidBody:
             # "质心在工作坐标系原点、轴与主轴重合" 那个坐标系给出的，
             # 而碰撞点也已经存在同一坐标系里，两者已经对齐。
             inertia = explicit
-            frame = (0.0, 0.0, 0.0, 1.0)
+            frame = quat.quat_identity()
         else:
             inertia = compute_inertia(spec.geometry, spec.mass)
             # 惯量主轴并进姿态：R_最终 = R_场景 ⊗ Q_主轴。
@@ -169,31 +159,104 @@ class RigidBody:
     # -- 几何辅助 ---------------------------------------------------------
 
     @property
+    def angular_velocity(self):
+        """世界角速度是当前姿态与世界角动量的派生量，避免重复状态失同步。"""
+        return self.inverse_inertia_world(self.angular_momentum)
+
+    @angular_velocity.setter
+    def angular_velocity(self, value):
+        # 保留场景/脚本设置角速度的接口，内部统一转换成世界角动量。
+        self.angular_momentum = self.inertia_world(value)
+
+    @property
+    def angular_speed_bound(self):
+        """固定角动量的自由转动期间，任意姿态下 |omega| 的上界。"""
+        if self.is_static:
+            return 0.0
+        return vec3.length(self.angular_momentum) / min(self.inertia_local)
+
+    def inertia_world(self, vector):
+        if self.is_static:
+            return (0.0, 0.0, 0.0)
+        local = quat.quat_rotate_vector(quat.quat_conjugate(self.orientation), vector)
+        return quat.quat_rotate_vector(self.orientation, tuple(i * x for i, x in zip(self.inertia_local, local)))
+
+    def add_force(self, force, point=None):
+        """累加世界坐标外力；可给世界作用点。载荷在一个完整 step 的所有子步生效。"""
+        if self.is_static:
+            return
+        self.force = vec3.add(self.force, force)
+        if point is not None:
+            self.add_torque(vec3.cross(vec3.sub(point, self.position), force))
+
+    def add_torque(self, torque):
+        if not self.is_static:
+            self.torque = vec3.add(self.torque, torque)
+
+    def clear_forces(self):
+        self.force = self.torque = (0.0, 0.0, 0.0)
+
+    def integrate_pose(self, h):
+        """平移 + 固定世界角动量下的二阶旋转中点积分。"""
+        if self.is_static:
+            return
+        self.position = vec3.madd(self.position, self.linear_velocity, h)
+        if self.angular_momentum == (0.0, 0.0, 0.0):
+            return
+        segments = max(1, math.ceil(self.angular_speed_bound * h / .25))
+        dt = h / segments
+        for _ in range(segments):
+            start = self.orientation
+            midpoint = quat.quat_integrate(start, self.angular_velocity, .5 * dt)
+            omega_mid = self.inverse_inertia_world(self.angular_momentum, orientation=midpoint)
+            self.orientation = quat.quat_integrate(start, omega_mid, dt)
+
+    @property
     def bounding_radius(self) -> float:
         """包围球半径，供宽阶段快速剔除与地面筛选使用。"""
         if self.geometry is None:
             return 0.0
         return self.geometry.bounding_radius()
 
-    def inverse_inertia_world(self, vector) -> tuple[float, float, float]:
+    def inverse_inertia_world(self, vector, orientation=None) -> tuple[float, float, float]:
         """对世界坐标向量施加世界坐标下的逆惯量矩阵。
 
         即计算 ``I_world⁻¹ · v``，其中 ``I_world = R · I_local · Rᵀ``。
-        展开后等价于：把 ``v`` 转到局部坐标、逐分量除以惯量、再转回世界。
+        当前姿态的矩阵按姿态和主逆惯量值缓存；临时中点姿态使用两次旋转求值，
+        不覆盖当前姿态缓存。角动量更新不使这个姿态算子失效。
 
         求解器里每个接触点、每次迭代都要调用它，是本模块最热的一小段。
         """
         if self.is_static:
             return (0.0, 0.0, 0.0)
 
-        inv_q = quat.quat_conjugate(self.orientation)
+        if orientation is None:
+            # Pose correction and public pose assignments are covered by value keys;
+            # impulses change L, not this operator. Frozen baseline pickles have no
+            # cache slots yet, so initialization is deliberately lazy.
+            key = (self.orientation, self.inv_inertia_local)
+            if getattr(self, "_inverse_cache_key", None) != key:
+                rotation = quat.quat_to_matrix(self.orientation)
+                diagonal = self.inv_inertia_local
+                self._inverse_cache_matrix = tuple(
+                    tuple(sum(rotation[i][k] * diagonal[k] * rotation[j][k] for k in range(3))
+                          for j in range(3)) for i in range(3))
+                self._inverse_cache_key = key
+            m = self._inverse_cache_matrix
+            x, y, z = vector
+            return (m[0][0] * x + m[0][1] * y + m[0][2] * z,
+                    m[1][0] * x + m[1][1] * y + m[1][2] * z,
+                    m[2][0] * x + m[2][1] * y + m[2][2] * z)
+
+        rotation = self.orientation if orientation is None else orientation
+        inv_q = quat.quat_conjugate(rotation)
         local = quat.quat_rotate_vector(inv_q, vector)
         scaled = (
             local[0] * self.inv_inertia_local[0],
             local[1] * self.inv_inertia_local[1],
             local[2] * self.inv_inertia_local[2],
         )
-        return quat.quat_rotate_vector(self.orientation, scaled)
+        return quat.quat_rotate_vector(rotation, scaled)
 
     def velocity_at(self, r) -> tuple[float, float, float]:
         """返回刚体上"相对质心位移为 ``r``"的那一点的速度。
@@ -204,6 +267,8 @@ class RigidBody:
         速度必须用这个函数算，直接用质心速度会漏掉旋转贡献——表现就是
         "物体被斜着撞到却不转"。
         """
+        if self.is_static:
+            return (0.0, 0.0, 0.0)
         return vec3.add(self.linear_velocity, vec3.cross(self.angular_velocity, r))
 
     def apply_impulse(self, impulse, r) -> None:
@@ -223,9 +288,7 @@ class RigidBody:
             return
         self.linear_velocity = vec3.madd(self.linear_velocity, impulse, self.inv_mass)
         torque = vec3.cross(r, impulse)
-        self.angular_velocity = vec3.add(
-            self.angular_velocity, self.inverse_inertia_world(torque)
-        )
+        self.angular_momentum = vec3.add(self.angular_momentum, torque)
 
     # -- 能量与诊断 -------------------------------------------------------
 
@@ -292,6 +355,8 @@ class PartView:
         "friction",
         "restitution",
         "is_static",
+        "angular_speed_bound",
+        "_support_rotation",
     )
 
     def __init__(self, body: "RigidBody", part) -> None:
@@ -303,6 +368,7 @@ class PartView:
             body.linear_velocity, vec3.cross(body.angular_velocity, offset)
         )
         self.angular_velocity = body.angular_velocity
+        self.angular_speed_bound = body.angular_speed_bound
         self.friction = body.friction
         self.restitution = body.restitution
         self.is_static = body.is_static

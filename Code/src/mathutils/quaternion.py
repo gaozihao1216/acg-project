@@ -181,6 +181,22 @@ def quat_rotate_vector(q: Quat, v: Vec3) -> tuple[float, float, float]:
     )
 
 
+def quat_rotate_vector_unit(q: Quat, v: Vec3) -> tuple[float, float, float]:
+    """Same arithmetic as quat_rotate_vector; caller supplies a normalized pose.
+
+    Used by support queries that normalize once per pose rather than once per
+    support sample. General callers should retain quat_rotate_vector.
+    """
+    w, x, y, z = q
+    vx, vy, vz = float(v[0]), float(v[1]), float(v[2])
+    tx = 2.0 * (y * vz - z * vy)
+    ty = 2.0 * (z * vx - x * vz)
+    tz = 2.0 * (x * vy - y * vx)
+    return (vx + w * tx + (y * tz - z * ty),
+            vy + w * ty + (z * tx - x * tz),
+            vz + w * tz + (x * ty - y * tx))
+
+
 def quat_to_matrix(q: Quat) -> tuple[tuple[float, float, float], ...]:
     """把单位四元数转换为 3x3 旋转矩阵（行优先嵌套元组）。
 

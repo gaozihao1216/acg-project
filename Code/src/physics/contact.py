@@ -72,7 +72,8 @@ class ContactPoint:
     端面接触一旦偏出 3° 容差就变成侧面或单点接触（标签整体换段），流形点数也会
     随姿态变化，P0-1 重建接触区域后采样点还会移动。所以真正的持久匹配仍需缓存
     两侧**局部锚点**，并在暖启动前校验法向夹角、锚点距离与间隙；不满足就丢弃，
-    而不是凭一个整数 ID 强行复用。这一步尚未做。
+    而不是凭一个整数 ID 强行复用。ContactManager 已实现这些校验；
+    GJK patch 路径直接保留表面锚点，旧中点后端则沿法向重建两侧锚点。
 
     单点接触（球-球、球-面、严格凸体只有一个支撑点）固定为 0：只有一个点，
     既不会冲突，也没有稳定性可言。
@@ -85,6 +86,8 @@ class ContactPoint:
     normal: tuple[float, float, float]
     penetration: float
     feature_id: int = 0
+    local_anchor_a: tuple[float, float, float] | None = None
+    local_anchor_b: tuple[float, float, float] | None = None
 
     def __post_init__(self) -> None:
         """做最基本的合法性检查，把错误挡在产生它的地方。"""

@@ -1,0 +1,48 @@
+Current contact-load measurements
+
+Raw median timings are uninstrumented. Stage shares come from a separate instrumented pass.
+Stage shares are exclusive; cProfile cumulative times overlap and must not be added.
+Setup/warmup, cloning, diagnostics, I/O and rendering are excluded from measured steps.
+No timing from historical results is reused. Source hashes identify the dirty working tree.
+Stacks are short warmed support loads, not a long-term settled-pile benchmark.
+Impact means equal-height boxes falling onto the floor synchronously.
+
+air          N=  10 median=2.032 ms/step range=[1.941,2.513] wall/sim=0.49
+  stages: toi_query=38.8%, narrowphase=27.3%, broadphase=22.7%, world_other=9.0%, external_forces=1.2%, pose_integration=0.6%, outside_substep=0.3%, position_solve=0.1%
+  counts (instrumented pass): {"active_position_constraints": 0, "actual_toi_events": 0, "candidate_pairs_returned": 0, "manifolds_returned": 0, "points_returned": 0}
+impact       N=  10 median=9.975 ms/step range=[7.754,10.618] wall/sim=2.39
+  stages: velocity_solve=47.1%, velocity_prepare=15.7%, narrowphase=13.1%, toi_query=8.4%, broadphase=7.5%, world_other=4.3%, pose_integration=3.3%, external_forces=0.4%, outside_substep=0.1%
+  counts (instrumented pass): {"active_position_constraints": 0, "actual_toi_events": 1, "candidate_pairs_returned": 0, "manifolds_returned": 10, "points_returned": 40, "velocity_constraints": 40}
+stack        N=  10 median=38.983 ms/step range=[33.972,45.473] wall/sim=9.36
+  stages: velocity_solve=39.9%, position_prepare=15.2%, velocity_prepare=13.8%, narrowphase=13.0%, toi_query=12.2%, broadphase=3.6%, world_other=1.3%, pose_integration=0.7%, position_solve=0.2%
+  counts (instrumented pass): {"active_position_constraints": 0, "actual_toi_events": 0, "candidate_pairs_returned": 432, "manifolds_returned": 360, "points_returned": 1374, "velocity_constraints": 684}
+air          N=  50 median=13.291 ms/step range=[10.125,15.957] wall/sim=3.19
+  stages: toi_query=43.0%, narrowphase=28.7%, broadphase=18.7%, world_other=7.8%, external_forces=1.0%, pose_integration=0.5%, outside_substep=0.2%
+  counts (instrumented pass): {"active_position_constraints": 0, "actual_toi_events": 0, "candidate_pairs_returned": 0, "manifolds_returned": 0, "points_returned": 0}
+impact       N=  50 median=37.848 ms/step range=[34.823,44.945] wall/sim=9.08
+  stages: velocity_solve=48.8%, velocity_prepare=13.8%, narrowphase=11.8%, broadphase=8.8%, toi_query=8.2%, world_other=4.1%, pose_integration=3.8%, external_forces=0.6%
+  counts (instrumented pass): {"active_position_constraints": 0, "actual_toi_events": 1, "candidate_pairs_returned": 0, "manifolds_returned": 50, "points_returned": 200, "velocity_constraints": 200}
+stack        N=  50 median=381.759 ms/step range=[290.604,419.504] wall/sim=91.62
+  stages: velocity_solve=42.8%, position_prepare=15.0%, velocity_prepare=14.2%, narrowphase=11.9%, toi_query=11.1%, broadphase=3.2%, world_other=0.9%, pose_integration=0.6%, position_solve=0.1%
+  counts (instrumented pass): {"active_position_constraints": 0, "actual_toi_events": 0, "candidate_pairs_returned": 2160, "manifolds_returned": 1800, "points_returned": 6870, "velocity_constraints": 3420}
+air          N= 125 median=60.038 ms/step range=[51.031,69.185] wall/sim=14.41
+  stages: toi_query=43.6%, narrowphase=29.4%, broadphase=18.0%, world_other=7.1%, external_forces=1.0%, pose_integration=0.7%, outside_substep=0.1%
+  counts (instrumented pass): {"active_position_constraints": 0, "actual_toi_events": 0, "candidate_pairs_returned": 0, "manifolds_returned": 0, "points_returned": 0}
+impact       N= 125 median=188.363 ms/step range=[179.580,191.676] wall/sim=45.21
+  stages: velocity_solve=50.2%, velocity_prepare=17.2%, narrowphase=11.0%, toi_query=8.4%, broadphase=6.5%, world_other=3.5%, pose_integration=2.8%, external_forces=0.5%
+  counts (instrumented pass): {"active_position_constraints": 0, "actual_toi_events": 1, "candidate_pairs_returned": 0, "manifolds_returned": 125, "points_returned": 500, "velocity_constraints": 500}
+stack        N= 125 median=1008.264 ms/step range=[827.379,1063.173] wall/sim=241.98
+  stages: velocity_solve=41.7%, position_prepare=15.3%, velocity_prepare=14.4%, narrowphase=12.3%, toi_query=11.0%, broadphase=3.6%, world_other=0.7%, pose_integration=0.7%, position_solve=0.1%
+  counts (instrumented pass): {"active_position_constraints": 0, "actual_toi_events": 0, "candidate_pairs_returned": 5400, "manifolds_returned": 4500, "points_returned": 17175, "velocity_constraints": 8550}
+air          N= 500 median=231.997 ms/step range=[226.351,240.366] wall/sim=55.68
+  stages: toi_query=42.0%, narrowphase=28.7%, broadphase=20.1%, world_other=7.4%, external_forces=1.1%, pose_integration=0.6%
+  counts (instrumented pass): {"active_position_constraints": 0, "actual_toi_events": 0, "candidate_pairs_returned": 0, "manifolds_returned": 0, "points_returned": 0}
+impact       N= 500 median=736.388 ms/step range=[714.547,785.793] wall/sim=176.73
+  stages: velocity_solve=49.7%, velocity_prepare=15.1%, narrowphase=11.4%, toi_query=8.7%, broadphase=7.7%, world_other=3.6%, pose_integration=3.4%, external_forces=0.4%
+  counts (instrumented pass): {"active_position_constraints": 0, "actual_toi_events": 1, "candidate_pairs_returned": 0, "manifolds_returned": 500, "points_returned": 2000, "velocity_constraints": 2000}
+stack        N= 500 median=3754.324 ms/step range=[3464.487,4167.667] wall/sim=901.04
+  stages: velocity_solve=41.0%, position_prepare=15.7%, velocity_prepare=14.1%, narrowphase=12.8%, toi_query=11.0%, broadphase=4.0%, world_other=0.8%, pose_integration=0.6%, position_solve=0.2%
+  counts (instrumented pass): {"active_position_constraints": 0, "actual_toi_events": 0, "candidate_pairs_returned": 7200, "manifolds_returned": 6000, "points_returned": 21900, "velocity_constraints": 10800}
+curved_demo  N=   5 median=67.004 ms/step range=[61.712,79.103] wall/sim=16.08
+  stages: narrowphase=65.6%, toi_query=18.2%, velocity_solve=8.3%, velocity_prepare=2.7%, position_prepare=2.6%, broadphase=1.5%, world_other=0.6%, pose_integration=0.3%
+  counts (instrumented pass): {"active_position_constraints": 0, "actual_toi_events": 0, "candidate_pairs_returned": 270, "manifolds_returned": 144, "points_returned": 288, "velocity_constraints": 144}

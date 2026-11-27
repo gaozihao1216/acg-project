@@ -1,0 +1,53 @@
+test_cache_checks_anchors_normals_and_feature_switches (__main__.DynamicsContactTests) ... ok
+test_contact_cache_expires_during_free_flight (__main__.DynamicsContactTests) ... ok
+test_curved_contact_preserves_both_surface_anchors (__main__.DynamicsContactTests) ... ok
+test_explicit_inertia_preserves_input_orientation (__main__.DynamicsContactTests) ... ok
+test_force_torque_and_impulse_have_consistent_units (__main__.DynamicsContactTests) ... ok
+test_friction_is_isotropic_and_bounded (__main__.DynamicsContactTests) ... ok
+test_ground_uses_both_materials (__main__.DynamicsContactTests) ... ok
+test_penetration_correction_does_not_create_kinetic_energy (__main__.DynamicsContactTests) ... ok
+test_position_correction_cannot_increase_spinning_body_energy (__main__.DynamicsContactTests) ... ok
+test_position_solve_preserves_physical_momenta (__main__.DynamicsContactTests) ... ok
+test_restitution_is_independent_of_position_bias (__main__.DynamicsContactTests) ... ok
+test_rotation_energy_error_converges (__main__.DynamicsContactTests) ... ok
+test_torque_free_rotation_conserves_world_momentum (__main__.DynamicsContactTests) ... ok
+test_warm_start_is_applied_once_per_substep (__main__.DynamicsContactTests) ... ok
+
+----------------------------------------------------------------------
+Ran 14 tests in 0.118s
+
+OK
+test_broadphases_match_with_default_toi (__main__.CollisionReliabilityTests) ... ok
+test_budget_exhaustion_does_not_free_fly (__main__.CollisionReliabilityTests) ... ok
+test_budget_last_event_can_finish_if_no_more_hits (__main__.CollisionReliabilityTests) ... ok
+test_conservative_probes_have_separate_work_budget (__main__.CollisionReliabilityTests) ... ok
+test_curved_pair_near_contact (__main__.CollisionReliabilityTests) ... ok
+test_existing_contact_refreshes_swept_candidates (__main__.CollisionReliabilityTests) ... ok
+test_ground_near_contact (__main__.CollisionReliabilityTests) ... ok
+test_polytope_pair_near_contact (__main__.CollisionReliabilityTests) ... ok
+test_rotated_thin_wall (__main__.CollisionReliabilityTests) ... ok
+test_sat_waits_for_all_separating_axes (__main__.CollisionReliabilityTests) ... ok
+test_sphere_thin_wall_near_contact (__main__.CollisionReliabilityTests) ... ok
+test_spheres_touching_and_subpicosecond_toi (__main__.CollisionReliabilityTests) ... ok
+test_touching_but_separating_has_no_event (__main__.CollisionReliabilityTests) ... ok
+
+----------------------------------------------------------------------
+Ran 13 tests in 0.191s
+
+OK
+========================================================================================
+暖启动（warm starting）
+========================================================================================
+[PASS] 1. 默认开启、可关闭、可序列化
+       默认 True，显式 false 生效，to_dict 含该键
+[PASS] 2. 低迭代时显著减小下沉
+       穿透 4.082 → 0.707 mm（5.77 倍），末速度 0.0928 → 0.0000 m/s（5582 倍）
+[PASS] 3. 与 TOI 共存不重复施加
+       高速棱柱落地峰值穿透 0.840 mm（要求 < 1 mm）
+[PASS] 4. 跨帧缓存不破坏确定性
+       两次运行位姿逐位相同（缓存未破坏确定性）
+[PASS] 5. 不注入能量
+       E0=22.131360 J → E1=22.025321 J，Δ=-1.060e-01 J
+----------------------------------------------------------------------------------------
+结果：5/5 通过
+========================================================================================

@@ -112,6 +112,8 @@ class Anchor:
     position: tuple
     normal: tuple
     penetration: float
+    point_a: tuple | None = None
+    point_b: tuple | None = None
 
 
 def contact_patch_world(body, direction) -> SupportPatch:
@@ -270,6 +272,8 @@ def contact_anchors(
                 position=_midpoint(anchor_a, anchor_b),
                 normal=normal,
                 penetration=penetration,
+                point_a=anchor_a,
+                point_b=anchor_b,
             )
         )
     return anchors

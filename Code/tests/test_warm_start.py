@@ -226,6 +226,8 @@ def test_no_double_apply_with_toi() -> tuple[bool, str]:
         ground=GroundSpec(enabled=True),
         simulation=SimulationSpec(
             enabled=True, physics_dt=1.0 / 240.0, substeps=3, iterations=8,
+            # 该精度验收要求 < 1 mm，位置容差应比它严格。默认 slop=2 mm 是宽松模式。
+            slop=0.0002, baumgarte=0.5,
             ground_z=0.0, duration=1.0, use_toi_splitting=True, warm_start=True,
         ),
         render=None,

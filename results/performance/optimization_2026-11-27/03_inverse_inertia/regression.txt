@@ -1,0 +1,73 @@
+test_cache_checks_anchors_normals_and_feature_switches (__main__.DynamicsContactTests) ... ok
+test_contact_cache_expires_during_free_flight (__main__.DynamicsContactTests) ... ok
+test_curved_contact_preserves_both_surface_anchors (__main__.DynamicsContactTests) ... ok
+test_explicit_inertia_preserves_input_orientation (__main__.DynamicsContactTests) ... ok
+test_force_torque_and_impulse_have_consistent_units (__main__.DynamicsContactTests) ... ok
+test_friction_is_isotropic_and_bounded (__main__.DynamicsContactTests) ... ok
+test_ground_uses_both_materials (__main__.DynamicsContactTests) ... ok
+test_inverse_inertia_cache_tracks_pose_and_diagonal (__main__.DynamicsContactTests) ... ok
+test_penetration_correction_does_not_create_kinetic_energy (__main__.DynamicsContactTests) ... ok
+test_position_correction_cannot_increase_spinning_body_energy (__main__.DynamicsContactTests) ... ok
+test_position_solve_preserves_physical_momenta (__main__.DynamicsContactTests) ... ok
+test_restitution_is_independent_of_position_bias (__main__.DynamicsContactTests) ... ok
+test_rotation_energy_error_converges (__main__.DynamicsContactTests) ... ok
+test_torque_free_rotation_conserves_world_momentum (__main__.DynamicsContactTests) ... ok
+test_warm_start_is_applied_once_per_substep (__main__.DynamicsContactTests) ... ok
+
+----------------------------------------------------------------------
+Ran 15 tests in 0.091s
+
+OK
+test_broadphases_match_with_default_toi (__main__.CollisionReliabilityTests) ... ok
+test_budget_exhaustion_does_not_free_fly (__main__.CollisionReliabilityTests) ... ok
+test_budget_last_event_can_finish_if_no_more_hits (__main__.CollisionReliabilityTests) ... ok
+test_conservative_probes_have_separate_work_budget (__main__.CollisionReliabilityTests) ... ok
+test_curved_pair_near_contact (__main__.CollisionReliabilityTests) ... ok
+test_existing_contact_refreshes_swept_candidates (__main__.CollisionReliabilityTests) ... ok
+test_ground_near_contact (__main__.CollisionReliabilityTests) ... ok
+test_polytope_pair_near_contact (__main__.CollisionReliabilityTests) ... ok
+test_rotated_thin_wall (__main__.CollisionReliabilityTests) ... ok
+test_sat_waits_for_all_separating_axes (__main__.CollisionReliabilityTests) ... ok
+test_sphere_thin_wall_near_contact (__main__.CollisionReliabilityTests) ... ok
+test_spheres_touching_and_subpicosecond_toi (__main__.CollisionReliabilityTests) ... ok
+test_touching_but_separating_has_no_event (__main__.CollisionReliabilityTests) ... ok
+
+----------------------------------------------------------------------
+Ran 13 tests in 0.139s
+
+OK
+====================================================================================================
+凸包 / 任意凸多面体：构造、质量属性、主轴并入姿态、广义 SAT
+====================================================================================================
+[PASS] 1. 立方体凸包：体积/面/棱精确
+       体积=1.000000000000，顶点=8，面=6（四边形=True），棱=12
+[PASS] 2. 内部点被剔除
+       408 个输入点 → 凸包顶点=8，面=6，体积=1.000000000000
+[PASS] 3. 共面/共线被拒绝
+       共面被拒绝=True  共线被拒绝=True
+[PASS] 4. 过复杂凸包在加载阶段报错
+       默认上限下被拒绝=True（凸包有 2395 个面，超过上限 64）；显式放宽后可以构造=True
+[PASS] 5. 凸包质量属性 vs 散度定理
+       体积=0.330000000000（解析 0.330000000000）；主惯量=[0.141616712, 0.197272177, 0.218888889]，与散度定理最大差=0.000e+00；质心吻合=True
+[PASS] 6. 主轴右手系（det=+1）
+       200 个随机对称阵：det<0 的个数=0，|det−1| 最大=1.332e-15
+[PASS] 7. 世界逆惯量 vs 完整张量
+       18 种姿态 × 5 个向量：世界逆惯量与完整张量最大差=1.776e-14
+[PASS] 8. 凸包顶点世界位置正确
+       6 个顶点世界位置最大差=2.220e-16
+[PASS] 9. 广义 SAT 在盒子上退化一致
+       200 组随机配置：接触判定不一致=0，法向不一致=0，最大穿透不一致=0（最大差=3.331e-16）
+[PASS] 10. 凸包-凸包法向取反
+       正向 2 点、反向 2 点，法向点积=-1.000000000（应为 −1）
+[PASS] 11. 球-凸包穿透精确
+       8 组（4 方向 × 2 穿透）全部精确=True
+[PASS] 12. 球心在凸包内部
+       球心在凸包内：穿透=[0.442632]（应 > 半径 0.15），法向单位化正确
+[PASS] 13. 凸包-地面多点流形与静置
+       静态接触点数=3（棱柱底面 3 顶点），法向全为 +Z=True；仿真 3 秒后 |v|=0.0000，最低顶点 z=-0.11 mm
+[PASS] 14. 凹体凸包体积更大（需组合体）
+       L 形真实体积=3.0000，凸包体积=3.9000，比值=1.300（凸包是外近似，凹体必须拆成凸块）
+[PASS] 15. 场景解析与支持表
+       从字典构造成功=True，体积=0.120000，单/双支持=True/True，可回写='hull'
+----------------------------------------------------------------------------------------------------
+结果：15/15 通过

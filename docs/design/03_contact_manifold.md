@@ -1,5 +1,12 @@
 # 接触流形：盒-盒裁剪、接触身份与支撑 patch 求交
 
+> 当前实现（2026-11-27）：ContactPoint 增加两侧局部锚点。GJK patch 主路径直接
+> 保留两侧表面求交点；解析/SAT 的旧中点输出通过深度沿法向重建锚点。
+> ContactManager 在物体对内一对一匹配，并校验锚点距离、法向与分离距离；特征
+> 切换允许按邻近锚点重配，但空过子步的旧冲量不再复用。回退点仍受原查询精度
+> 限制，不能把“已有局部锚点”理解为任意退化接触都已精确求解。
+
+
 > 窄相：`Code/src/physics/sat.py`（盒-盒）、`Code/src/physics/gjk.py`（任意凸体）
 > 测试：`python Code/tests/test_box_box.py`（10 项）
 > 演示：`results/w2/demo_box_stack.mp4`（37 帧 / 24 fps / 1.5 s）

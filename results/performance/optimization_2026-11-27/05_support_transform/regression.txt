@@ -1,0 +1,76 @@
+test_broadphases_match_with_default_toi (__main__.CollisionReliabilityTests) ... ok
+test_budget_exhaustion_does_not_free_fly (__main__.CollisionReliabilityTests) ... ok
+test_budget_last_event_can_finish_if_no_more_hits (__main__.CollisionReliabilityTests) ... ok
+test_conservative_probes_have_separate_work_budget (__main__.CollisionReliabilityTests) ... ok
+test_curved_pair_near_contact (__main__.CollisionReliabilityTests) ... ok
+test_existing_contact_refreshes_swept_candidates (__main__.CollisionReliabilityTests) ... ok
+test_ground_culling_keeps_fast_falls_and_rotational_sweeps (__main__.CollisionReliabilityTests) ... ok
+test_ground_near_contact (__main__.CollisionReliabilityTests) ... ok
+test_polytope_pair_near_contact (__main__.CollisionReliabilityTests) ... ok
+test_rotated_thin_wall (__main__.CollisionReliabilityTests) ... ok
+test_sat_waits_for_all_separating_axes (__main__.CollisionReliabilityTests) ... ok
+test_sphere_thin_wall_near_contact (__main__.CollisionReliabilityTests) ... ok
+test_spheres_touching_and_subpicosecond_toi (__main__.CollisionReliabilityTests) ... ok
+test_support_transform_cache_tracks_pose_translation_and_geometry (__main__.CollisionReliabilityTests) ... ok
+test_touching_but_separating_has_no_event (__main__.CollisionReliabilityTests) ... ok
+
+----------------------------------------------------------------------
+Ran 15 tests in 0.128s
+
+OK
+========================================================================================
+柱 / 胶囊：支撑映射 + GJK/EPA 窄相与 TOI 验证
+========================================================================================
+[PASS] 1. 圆柱立着落地能静置
+       静置 4s：速度=0.0000 m/s，z=0.3000（期望 0.3），高度误差=-0.01 mm，最大穿透=0.01 mm
+[PASS] 2. 胶囊竖放落地能静置
+       静置 4s：速度=0.0000 m/s，z=0.4498（期望 0.45），高度误差=-0.20 mm，最大穿透=0.20 mm
+[PASS] 3. 胶囊横放落地不翻滚
+       静置 4s：z=0.1999（期望 0.2），高度误差=-0.12 mm，轴与竖直夹角=90.0°，角速度=0.0000 rad/s
+[PASS] 4. 球-柱深度与法向对照解析解
+       116 组接触对照解析解：最大法向偏差=1.782°，最大深度偏差=0.1517 mm（阈值 2° / 0.2 mm）
+[PASS] 5. 柱压在盒面上得到 4 点流形
+       接触点=4（期望 4），深度=[2.0, 2.0, 2.0, 2.0] mm（期望 2.0），法向=(0.0, 0.0, -1.0)（期望 (0,0,-1)）
+[PASS] 6. 高速柱不穿透地面
+       初速 -15 m/s 撞地：全程最低底面 z=-0.00046（下限 -0.01）
+[PASS] 7. 柱-柱挤压深度与解析一致
+       深度=[30.0, 30.0] mm（期望 30.000），法向偏差=0.000°，点数=2
+[PASS] 8. 曲面 TOI 与解析接触时刻一致
+       TOI=0.775100s，解析=0.775000s，误差=0.1000 ms，双向对称性=0.00e+00
+[PASS] 9. 盒-盒上 GJK/EPA 与 SAT 一致
+       120 组盒-盒：最大法向偏差=0.000°、最大深度偏差=0.0000 mm（阈值 1° / 1 mm）
+[PASS] 10. GJK 距离双向对称且远离无接触
+       100 组距离双向最大差=0.00e+00 m；相距 5 m 的两个柱接触点=0
+[PASS] 11. 世界层面柱-盒场景收敛
+       柱落在盒上：z=0.4000（期望 0.4），误差=-0.0 mm，柱速度=0.0000 m/s，盒速度=0.0000 m/s，流形数=2，最大穿透=0.06 mm
+----------------------------------------------------------------------------------------
+结果：11/11 通过
+========================================================================================
+========================================================================================
+支撑 patch 语义层（投影 / 求交 / 稀疏 / 锚点 / 身份）
+========================================================================================
+[PASS] 1. P0-1 场景的交集落在搭接带内
+       4 点，x∈[0.8000, 1.0000]，深度 0.1，回退 0 次
+[PASS] 2. 退化类别以投影结果为准
+       退化成 2 点线段，深度 0.5
+[PASS] 3. 交换 A/B 得到同一组位置
+       4 点，交换后位置偏差 ≤ 1e-9 m
+[PASS] 4. 稀疏：确定性 + 铺开 + 不补点
+       4 点，跨度 2.000 × 2.000，输入反向结果不变
+[PASS] 5. 空交集的原因可区分
+       disjoint / missing_patch 两种空集都正确且不产生锚点
+[PASS] 6. 标签一对一分配
+       4 点→[0, 1, 2, 3]，3 重合点→[0, 1, 3]
+[PASS] 7. 接触路径的边数预算
+       接触 64 边 / 求交 100 边
+[PASS] 8. 倾斜端面逐点深度、高侧不建约束
+       4 点，深度 0.000–20.154 mm（都 ≥ 0）
+[PASS] 9. 近边缘交换后回退不偏力臂
+       反向 2 点、回退 0 次，位置都在 x≈1.0、|y|≤0.02
+[PASS] 10. 倾斜母线按端点插值算深度
+       2 点，深度 22.267 mm 以内变化，分离端已被裁掉
+[PASS] 11. 两点裁剪不产生重合锚点
+       2 个锚点，深度 0 / 20 mm，无重合
+----------------------------------------------------------------------------------------
+结果：11/11 通过
+========================================================================================

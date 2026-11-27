@@ -705,6 +705,8 @@ def _flipped(point: ContactPoint) -> ContactPoint:
         normal=vec3.scale(point.normal, -1.0),
         penetration=point.penetration,
         feature_id=point.feature_id,
+        local_anchor_a=point.local_anchor_b,
+        local_anchor_b=point.local_anchor_a,
     )
 
 
@@ -844,6 +846,10 @@ def collide_compound(index_a, body_a, index_b, body_b) -> list[ContactPoint]:
                         normal=point.normal,
                         penetration=point.penetration,
                         feature_id=offset + point.feature_id,
+                        local_anchor_a=(None if point.local_anchor_a is None else
+                                        _world_to_local(body_a, _local_to_world(view_a, point.local_anchor_a))),
+                        local_anchor_b=(None if point.local_anchor_b is None else
+                                        _world_to_local(body_b, _local_to_world(view_b, point.local_anchor_b))),
                     )
                 )
     return points
@@ -938,13 +944,16 @@ def detect_contacts(
                 ground_points = _part_ground_points(body_i, ground)
 
             if ground_points:
+                restitution, friction = merge_pair_materials(
+                    ground.restitution, body_i.restitution, ground.friction, body_i.friction,
+                )
                 manifolds.append(
                     ContactManifold(
                         body_a=GROUND_BODY,
                         body_b=i,
                         points=ground_points,
-                        friction=ground.friction,
-                        restitution=ground.restitution,
+                        friction=friction,
+                        restitution=restitution,
                     )
                 )
 

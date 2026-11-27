@@ -1,0 +1,1298 @@
+{
+  "protocol": "paired/1",
+  "order": "rotating variant order within each case/round",
+  "gc": "collect before each untimed-to-timed boundary; enabled during timing",
+  "python": "3.10.9 (tags/v3.10.9:1dd9be6, Dec  6 2022, 20:01:21) [MSC v.1934 64 bit (AMD64)]",
+  "platform": "Windows-10-10.0.26200-SP0",
+  "comparison_script_sha256": "ce203a1788e441c421c3a3626816a434eaba2e6aaae88dfba4f709f136a4a91b",
+  "source_archives": {
+    "01_baseline": "ea4ac82512b4c0b8d698d6dca0c0e290d541e14e901d6d19e4b5a5142d4bdbe2",
+    "02_position_prepare": "25f4c3cdbff53771eec7652beb80d8560beb11b51e095114dcfbbecee372aa73",
+    "03_inverse_inertia": "f0d51dbf6b8b6cc0c18cecaa59c26a1e28c7e24e830ffe6cb6893f1660f413b0",
+    "04_ground_culling": "992c60673316f73095b72b507b7ac27af4e3e45a50a1985728cddb110df42f2b",
+    "05_support_transform": "a4ee29fa7b51f6ede862f1d2ded487a1d2b56a17ded6740dcab0253347be4bfc"
+  },
+  "stages": [
+    "01_baseline",
+    "02_position_prepare",
+    "03_inverse_inertia",
+    "04_ground_culling",
+    "05_support_transform"
+  ],
+  "results": [
+    {
+      "case": "air",
+      "bodies": 10,
+      "steps_per_round": 6,
+      "rounds": 5,
+      "stages": {
+        "01_baseline": {
+          "raw_ms": [
+            5.99628333778431,
+            6.317750007535021,
+            6.81175000499934,
+            6.637383329992493,
+            5.399866650501887
+          ],
+          "median_ms": 6.317750007535021,
+          "cumulative_speedup": 1.0,
+          "incremental_speedup": 1.0,
+          "physical_difference": {
+            "position": 0.0,
+            "orientation_radians": 0.0,
+            "linear_velocity": 0.0,
+            "angular_momentum": 0.0
+          }
+        },
+        "02_position_prepare": {
+          "raw_ms": [
+            6.843899997572104,
+            5.777899990789592,
+            6.485266688590248,
+            7.4801333248615265,
+            5.629183336471518
+          ],
+          "median_ms": 6.485266688590248,
+          "cumulative_speedup": 0.9592628855265939,
+          "incremental_speedup": 0.9592628855265939,
+          "physical_difference": {
+            "position": 0.0,
+            "orientation_radians": 0.0,
+            "linear_velocity": 0.0,
+            "angular_momentum": 0.0
+          }
+        },
+        "03_inverse_inertia": {
+          "raw_ms": [
+            5.818550009280443,
+            5.876683358413477,
+            5.916949982444446,
+            5.156733328476548,
+            5.027499981224537
+          ],
+          "median_ms": 5.818550009280443,
+          "cumulative_speedup": 1.0750536692588823,
+          "incremental_speedup": 1.1196784400783688,
+          "physical_difference": {
+            "position": 0.0,
+            "orientation_radians": 0.0,
+            "linear_velocity": 0.0,
+            "angular_momentum": 0.0
+          }
+        },
+        "04_ground_culling": {
+          "raw_ms": [
+            3.5918333645289144,
+            3.8438333431258798,
+            3.4737500051657357,
+            3.800883307121694,
+            3.664700003961722
+          ],
+          "median_ms": 3.664700003961722,
+          "cumulative_speedup": 1.6694213592981506,
+          "incremental_speedup": 1.5288600815441298,
+          "physical_difference": {
+            "position": 0.0,
+            "orientation_radians": 0.0,
+            "linear_velocity": 0.0,
+            "angular_momentum": 0.0
+          }
+        },
+        "05_support_transform": {
+          "raw_ms": [
+            5.126099994716545,
+            3.811633330769837,
+            4.014550009742379,
+            3.2799832988530397,
+            3.8999999718119702
+          ],
+          "median_ms": 3.8999999718119702,
+          "cumulative_speedup": 1.657491542151832,
+          "incremental_speedup": 0.9396666744741216,
+          "physical_difference": {
+            "position": 0.0,
+            "orientation_radians": 0.0,
+            "linear_velocity": 0.0,
+            "angular_momentum": 0.0
+          }
+        }
+      }
+    },
+    {
+      "case": "impact",
+      "bodies": 10,
+      "steps_per_round": 1,
+      "rounds": 5,
+      "stages": {
+        "01_baseline": {
+          "raw_ms": [
+            18.360899994149804,
+            20.194799872115254,
+            19.505899865180254,
+            16.52170019224286,
+            15.56819980032742
+          ],
+          "median_ms": 18.360899994149804,
+          "cumulative_speedup": 1.0,
+          "incremental_speedup": 1.0,
+          "physical_difference": {
+            "position": 0.0,
+            "orientation_radians": 0.0,
+            "linear_velocity": 0.0,
+            "angular_momentum": 0.0
+          }
+        },
+        "02_position_prepare": {
+          "raw_ms": [
+            16.578099923208356,
+            17.915500095114112,
+            18.9455000218004,
+            15.080800047144294,
+            14.64730012230575
+          ],
+          "median_ms": 16.578099923208356,
+          "cumulative_speedup": 1.0955453384829816,
+          "incremental_speedup": 1.0955453384829816,
+          "physical_difference": {
+            "position": 0.0,
+            "orientation_radians": 0.0,
+            "linear_velocity": 0.0,
+            "angular_momentum": 0.0
+          }
+        },
+        "03_inverse_inertia": {
+          "raw_ms": [
+            15.464400174096227,
+            14.614799991250038,
+            17.033200012519956,
+            14.124500099569559,
+            15.792699996381998
+          ],
+          "median_ms": 15.464400174096227,
+          "cumulative_speedup": 1.1697192874632325,
+          "incremental_speedup": 1.0720170027013167,
+          "physical_difference": {
+            "position": 0.0,
+            "orientation_radians": 0.0,
+            "linear_velocity": 0.0,
+            "angular_momentum": 0.0
+          }
+        },
+        "04_ground_culling": {
+          "raw_ms": [
+            14.681600034236908,
+            16.742999898269773,
+            12.751299887895584,
+            13.24059977196157,
+            15.369900036603212
+          ],
+          "median_ms": 14.681600034236908,
+          "cumulative_speedup": 1.2478060266748174,
+          "incremental_speedup": 1.053318448808976,
+          "physical_difference": {
+            "position": 0.0,
+            "orientation_radians": 0.0,
+            "linear_velocity": 0.0,
+            "angular_momentum": 0.0
+          }
+        },
+        "05_support_transform": {
+          "raw_ms": [
+            16.539799980819225,
+            16.94410014897585,
+            15.90960007160902,
+            14.718900201842189,
+            14.89190012216568
+          ],
+          "median_ms": 15.90960007160902,
+          "cumulative_speedup": 1.1224819766204432,
+          "incremental_speedup": 0.8995644776709881,
+          "physical_difference": {
+            "position": 0.0,
+            "orientation_radians": 0.0,
+            "linear_velocity": 0.0,
+            "angular_momentum": 0.0
+          }
+        }
+      }
+    },
+    {
+      "case": "stack",
+      "bodies": 10,
+      "steps_per_round": 6,
+      "rounds": 5,
+      "stages": {
+        "01_baseline": {
+          "raw_ms": [
+            87.21473335754126,
+            90.7937166436265,
+            93.2854999943326,
+            94.40421666173886,
+            88.81226667047788
+          ],
+          "median_ms": 90.7937166436265,
+          "cumulative_speedup": 1.0,
+          "incremental_speedup": 1.0,
+          "physical_difference": {
+            "position": 0.0,
+            "orientation_radians": 0.0,
+            "linear_velocity": 0.0,
+            "angular_momentum": 0.0
+          }
+        },
+        "02_position_prepare": {
+          "raw_ms": [
+            76.67836667193721,
+            75.61536664919306,
+            73.87935001558314,
+            72.52916670404375,
+            69.05846670269966
+          ],
+          "median_ms": 73.87935001558314,
+          "cumulative_speedup": 1.2626735342779298,
+          "incremental_speedup": 1.2626735342779298,
+          "physical_difference": {
+            "position": 0.0,
+            "orientation_radians": 0.0,
+            "linear_velocity": 0.0,
+            "angular_momentum": 0.0
+          }
+        },
+        "03_inverse_inertia": {
+          "raw_ms": [
+            56.74686667043716,
+            60.095300005438425,
+            57.731783327957,
+            53.47718333359808,
+            59.87576666908959
+          ],
+          "median_ms": 57.731783327957,
+          "cumulative_speedup": 1.5369083523862057,
+          "incremental_speedup": 1.2796997729291792,
+          "physical_difference": {
+            "position": 8.131516293641283e-20,
+            "orientation_radians": 1.6660515812468967e-19,
+            "linear_velocity": 5.204170427930421e-18,
+            "angular_momentum": 4.87890977618477e-19
+          }
+        },
+        "04_ground_culling": {
+          "raw_ms": [
+            57.18958331272006,
+            54.94886663897584,
+            55.541550003302596,
+            57.06341665548583,
+            55.1595666911453
+          ],
+          "median_ms": 55.541550003302596,
+          "cumulative_speedup": 1.6523310160363802,
+          "incremental_speedup": 1.0394341411884285,
+          "physical_difference": {
+            "position": 8.131516293641283e-20,
+            "orientation_radians": 1.6660515812468967e-19,
+            "linear_velocity": 5.204170427930421e-18,
+            "angular_momentum": 4.87890977618477e-19
+          }
+        },
+        "05_support_transform": {
+          "raw_ms": [
+            57.11341664815942,
+            64.2697000099967,
+            57.13831668253988,
+            61.1406333434085,
+            61.49711669422686
+          ],
+          "median_ms": 61.1406333434085,
+          "cumulative_speedup": 1.5270445803447115,
+          "incremental_speedup": 0.9333141240944925,
+          "physical_difference": {
+            "position": 8.131516293641283e-20,
+            "orientation_radians": 1.6660515812468967e-19,
+            "linear_velocity": 5.204170427930421e-18,
+            "angular_momentum": 4.87890977618477e-19
+          }
+        }
+      }
+    },
+    {
+      "case": "air",
+      "bodies": 50,
+      "steps_per_round": 6,
+      "rounds": 5,
+      "stages": {
+        "01_baseline": {
+          "raw_ms": [
+            30.341666657477617,
+            25.74120000159989,
+            25.38819999123613,
+            25.916466683459777,
+            28.763983321065705
+          ],
+          "median_ms": 25.916466683459777,
+          "cumulative_speedup": 1.0,
+          "incremental_speedup": 1.0,
+          "physical_difference": {
+            "position": 0.0,
+            "orientation_radians": 0.0,
+            "linear_velocity": 0.0,
+            "angular_momentum": 0.0
+          }
+        },
+        "02_position_prepare": {
+          "raw_ms": [
+            28.398466645739973,
+            26.048600013988715,
+            26.085883340177435,
+            26.666516670957208,
+            26.027749991044402
+          ],
+          "median_ms": 26.085883340177435,
+          "cumulative_speedup": 0.9881989814337913,
+          "incremental_speedup": 0.9881989814337913,
+          "physical_difference": {
+            "position": 0.0,
+            "orientation_radians": 0.0,
+            "linear_velocity": 0.0,
+            "angular_momentum": 0.0
+          }
+        },
+        "03_inverse_inertia": {
+          "raw_ms": [
+            27.646733331494033,
+            24.35943332966417,
+            28.314183349721134,
+            24.813449980380636,
+            24.32640001643449
+          ],
+          "median_ms": 24.813449980380636,
+          "cumulative_speedup": 1.0567240893183276,
+          "incremental_speedup": 1.0693434310012264,
+          "physical_difference": {
+            "position": 0.0,
+            "orientation_radians": 0.0,
+            "linear_velocity": 0.0,
+            "angular_momentum": 0.0
+          }
+        },
+        "04_ground_culling": {
+          "raw_ms": [
+            18.57953332364559,
+            14.29585002673169,
+            14.615000031578044,
+            15.188400012751421,
+            17.064766647915047
+          ],
+          "median_ms": 15.188400012751421,
+          "cumulative_speedup": 1.7063329028535994,
+          "incremental_speedup": 1.6337105922643929,
+          "physical_difference": {
+            "position": 0.0,
+            "orientation_radians": 0.0,
+            "linear_velocity": 0.0,
+            "angular_momentum": 0.0
+          }
+        },
+        "05_support_transform": {
+          "raw_ms": [
+            16.812050016596913,
+            13.540866668336093,
+            14.267633319832385,
+            14.050916652195156,
+            15.680450014770031
+          ],
+          "median_ms": 14.267633319832385,
+          "cumulative_speedup": 1.8343850650951843,
+          "incremental_speedup": 1.0809543881522177,
+          "physical_difference": {
+            "position": 0.0,
+            "orientation_radians": 0.0,
+            "linear_velocity": 0.0,
+            "angular_momentum": 0.0
+          }
+        }
+      }
+    },
+    {
+      "case": "impact",
+      "bodies": 50,
+      "steps_per_round": 1,
+      "rounds": 5,
+      "stages": {
+        "01_baseline": {
+          "raw_ms": [
+            79.47189989499748,
+            88.68640009313822,
+            80.76860010623932,
+            80.31450002454221,
+            78.25689995661378
+          ],
+          "median_ms": 80.31450002454221,
+          "cumulative_speedup": 1.0,
+          "incremental_speedup": 1.0,
+          "physical_difference": {
+            "position": 0.0,
+            "orientation_radians": 0.0,
+            "linear_velocity": 0.0,
+            "angular_momentum": 0.0
+          }
+        },
+        "02_position_prepare": {
+          "raw_ms": [
+            72.77880003675818,
+            84.32190003804862,
+            76.80070004425943,
+            87.16599992476404,
+            79.74469987675548
+          ],
+          "median_ms": 79.74469987675548,
+          "cumulative_speedup": 1.051664894456603,
+          "incremental_speedup": 1.051664894456603,
+          "physical_difference": {
+            "position": 0.0,
+            "orientation_radians": 0.0,
+            "linear_velocity": 0.0,
+            "angular_momentum": 0.0
+          }
+        },
+        "03_inverse_inertia": {
+          "raw_ms": [
+            73.16539995372295,
+            64.41750004887581,
+            67.19040009193122,
+            60.58420008048415,
+            62.38089990802109
+          ],
+          "median_ms": 64.41750004887581,
+          "cumulative_speedup": 1.2545009782161112,
+          "incremental_speedup": 1.2783512260056655,
+          "physical_difference": {
+            "position": 0.0,
+            "orientation_radians": 0.0,
+            "linear_velocity": 0.0,
+            "angular_momentum": 0.0
+          }
+        },
+        "04_ground_culling": {
+          "raw_ms": [
+            66.04519998654723,
+            60.771899996325374,
+            60.5062001850456,
+            58.71859984472394,
+            62.699300004169345
+          ],
+          "median_ms": 60.771899996325374,
+          "cumulative_speedup": 1.3348813817298952,
+          "incremental_speedup": 1.0599882520173118,
+          "physical_difference": {
+            "position": 0.0,
+            "orientation_radians": 0.0,
+            "linear_velocity": 0.0,
+            "angular_momentum": 0.0
+          }
+        },
+        "05_support_transform": {
+          "raw_ms": [
+            66.0729999653995,
+            66.78899982944131,
+            66.81859982199967,
+            63.61209996975958,
+            67.15239980258048
+          ],
+          "median_ms": 66.78899982944131,
+          "cumulative_speedup": 1.2087742084000792,
+          "incremental_speedup": 0.9230728096170076,
+          "physical_difference": {
+            "position": 0.0,
+            "orientation_radians": 0.0,
+            "linear_velocity": 0.0,
+            "angular_momentum": 0.0
+          }
+        }
+      }
+    },
+    {
+      "case": "stack",
+      "bodies": 50,
+      "steps_per_round": 6,
+      "rounds": 5,
+      "stages": {
+        "01_baseline": {
+          "raw_ms": [
+            429.2738833464682,
+            406.68093335504335,
+            413.76076665862155,
+            414.6472333619992,
+            410.9025666645418
+          ],
+          "median_ms": 413.76076665862155,
+          "cumulative_speedup": 1.0,
+          "incremental_speedup": 1.0,
+          "physical_difference": {
+            "position": 0.0,
+            "orientation_radians": 0.0,
+            "linear_velocity": 0.0,
+            "angular_momentum": 0.0
+          }
+        },
+        "02_position_prepare": {
+          "raw_ms": [
+            361.49581665328395,
+            362.2137833153829,
+            349.48873333632946,
+            363.35763331347454,
+            343.85041663578403
+          ],
+          "median_ms": 361.49581665328395,
+          "cumulative_speedup": 1.183903019444235,
+          "incremental_speedup": 1.183903019444235,
+          "physical_difference": {
+            "position": 0.0,
+            "orientation_radians": 0.0,
+            "linear_velocity": 0.0,
+            "angular_momentum": 0.0
+          }
+        },
+        "03_inverse_inertia": {
+          "raw_ms": [
+            276.6745500266552,
+            272.0822166496267,
+            263.5822833205263,
+            287.7423499788468,
+            267.5603499713664
+          ],
+          "median_ms": 272.0822166496267,
+          "cumulative_speedup": 1.5357378875775707,
+          "incremental_speedup": 1.306574155875403,
+          "physical_difference": {
+            "position": 1.3552527156068805e-19,
+            "orientation_radians": 2.249984827884238e-19,
+            "linear_velocity": 9.540979117872439e-18,
+            "angular_momentum": 6.166399856011306e-19
+          }
+        },
+        "04_ground_culling": {
+          "raw_ms": [
+            292.8660666802898,
+            265.205733361654,
+            265.3524833343302,
+            268.29368333953124,
+            255.11201665115854
+          ],
+          "median_ms": 265.3524833343302,
+          "cumulative_speedup": 1.545497561480993,
+          "incremental_speedup": 1.0259288636064117,
+          "physical_difference": {
+            "position": 1.3552527156068805e-19,
+            "orientation_radians": 2.249984827884238e-19,
+            "linear_velocity": 9.540979117872439e-18,
+            "angular_momentum": 6.166399856011306e-19
+          }
+        },
+        "05_support_transform": {
+          "raw_ms": [
+            285.0853666507949,
+            258.2941666478291,
+            262.9678666902085,
+            259.23078332562,
+            269.7953333457311
+          ],
+          "median_ms": 262.9678666902085,
+          "cumulative_speedup": 1.5734270953570761,
+          "incremental_speedup": 1.0267585087325972,
+          "physical_difference": {
+            "position": 1.3552527156068805e-19,
+            "orientation_radians": 2.249984827884238e-19,
+            "linear_velocity": 9.540979117872439e-18,
+            "angular_momentum": 6.166399856011306e-19
+          }
+        }
+      }
+    },
+    {
+      "case": "air",
+      "bodies": 125,
+      "steps_per_round": 6,
+      "rounds": 5,
+      "stages": {
+        "01_baseline": {
+          "raw_ms": [
+            62.12826663007339,
+            66.90733332652599,
+            68.90955000805359,
+            69.33628333111604,
+            66.55486669236173
+          ],
+          "median_ms": 66.90733332652599,
+          "cumulative_speedup": 1.0,
+          "incremental_speedup": 1.0,
+          "physical_difference": {
+            "position": 0.0,
+            "orientation_radians": 0.0,
+            "linear_velocity": 0.0,
+            "angular_momentum": 0.0
+          }
+        },
+        "02_position_prepare": {
+          "raw_ms": [
+            64.19636670034379,
+            67.43004999589175,
+            69.40083333756775,
+            66.45084999036044,
+            64.59010000495861
+          ],
+          "median_ms": 66.45084999036044,
+          "cumulative_speedup": 0.9929210744902076,
+          "incremental_speedup": 0.9929210744902076,
+          "physical_difference": {
+            "position": 0.0,
+            "orientation_radians": 0.0,
+            "linear_velocity": 0.0,
+            "angular_momentum": 0.0
+          }
+        },
+        "03_inverse_inertia": {
+          "raw_ms": [
+            60.17191665402303,
+            62.693900001856186,
+            64.91039999915908,
+            65.73566666338593,
+            62.152800033800304
+          ],
+          "median_ms": 62.693900001856186,
+          "cumulative_speedup": 1.0616103121987588,
+          "incremental_speedup": 1.066882530424626,
+          "physical_difference": {
+            "position": 0.0,
+            "orientation_radians": 0.0,
+            "linear_velocity": 0.0,
+            "angular_momentum": 0.0
+          }
+        },
+        "04_ground_culling": {
+          "raw_ms": [
+            35.685533308424056,
+            37.141533296865724,
+            39.72013333501915,
+            40.2510833616058,
+            35.65520001575351
+          ],
+          "median_ms": 37.141533296865724,
+          "cumulative_speedup": 1.740993082353828,
+          "incremental_speedup": 1.6861711476739687,
+          "physical_difference": {
+            "position": 0.0,
+            "orientation_radians": 0.0,
+            "linear_velocity": 0.0,
+            "angular_momentum": 0.0
+          }
+        },
+        "05_support_transform": {
+          "raw_ms": [
+            36.58021668282648,
+            37.221983346777655,
+            37.663449998945,
+            38.8264333208402,
+            38.20188335763911
+          ],
+          "median_ms": 37.663449998945,
+          "cumulative_speedup": 1.7858009969177258,
+          "incremental_speedup": 0.9978386415048758,
+          "physical_difference": {
+            "position": 0.0,
+            "orientation_radians": 0.0,
+            "linear_velocity": 0.0,
+            "angular_momentum": 0.0
+          }
+        }
+      }
+    },
+    {
+      "case": "impact",
+      "bodies": 125,
+      "steps_per_round": 1,
+      "rounds": 5,
+      "stages": {
+        "01_baseline": {
+          "raw_ms": [
+            190.5755999032408,
+            202.79340003617108,
+            203.0926998704672,
+            213.14030000939965,
+            227.72710002027452
+          ],
+          "median_ms": 203.0926998704672,
+          "cumulative_speedup": 1.0,
+          "incremental_speedup": 1.0,
+          "physical_difference": {
+            "position": 0.0,
+            "orientation_radians": 0.0,
+            "linear_velocity": 0.0,
+            "angular_momentum": 0.0
+          }
+        },
+        "02_position_prepare": {
+          "raw_ms": [
+            195.15829998999834,
+            204.4682998675853,
+            213.71289994567633,
+            205.32519998960197,
+            207.4352998752147
+          ],
+          "median_ms": 205.32519998960197,
+          "cumulative_speedup": 0.9918085109892394,
+          "incremental_speedup": 0.9918085109892394,
+          "physical_difference": {
+            "position": 0.0,
+            "orientation_radians": 0.0,
+            "linear_velocity": 0.0,
+            "angular_momentum": 0.0
+          }
+        },
+        "03_inverse_inertia": {
+          "raw_ms": [
+            158.245500177145,
+            168.4154998511076,
+            168.33240003325045,
+            174.0451999939978,
+            172.46529995463789
+          ],
+          "median_ms": 168.4154998511076,
+          "cumulative_speedup": 1.2064979756146208,
+          "incremental_speedup": 1.2140705579257918,
+          "physical_difference": {
+            "position": 0.0,
+            "orientation_radians": 0.0,
+            "linear_velocity": 0.0,
+            "angular_momentum": 0.0
+          }
+        },
+        "04_ground_culling": {
+          "raw_ms": [
+            165.46399984508753,
+            166.30310006439686,
+            168.02199999801815,
+            178.10679995454848,
+            172.91279998607934
+          ],
+          "median_ms": 168.02199999801815,
+          "cumulative_speedup": 1.208726832634195,
+          "incremental_speedup": 0.9974119901390904,
+          "physical_difference": {
+            "position": 0.0,
+            "orientation_radians": 0.0,
+            "linear_velocity": 0.0,
+            "angular_momentum": 0.0
+          }
+        },
+        "05_support_transform": {
+          "raw_ms": [
+            166.60879994742572,
+            166.94219992496073,
+            189.6520999725908,
+            168.3146001305431,
+            177.77889990247786
+          ],
+          "median_ms": 168.3146001305431,
+          "cumulative_speedup": 1.2147521724724197,
+          "incremental_speedup": 0.9931288137079227,
+          "physical_difference": {
+            "position": 0.0,
+            "orientation_radians": 0.0,
+            "linear_velocity": 0.0,
+            "angular_momentum": 0.0
+          }
+        }
+      }
+    },
+    {
+      "case": "stack",
+      "bodies": 125,
+      "steps_per_round": 6,
+      "rounds": 5,
+      "stages": {
+        "01_baseline": {
+          "raw_ms": [
+            1095.445733323383,
+            1070.8966833384086,
+            1042.9623666762684,
+            1037.7472166825708,
+            1044.6949166556199
+          ],
+          "median_ms": 1044.6949166556199,
+          "cumulative_speedup": 1.0,
+          "incremental_speedup": 1.0,
+          "physical_difference": {
+            "position": 0.0,
+            "orientation_radians": 0.0,
+            "linear_velocity": 0.0,
+            "angular_momentum": 0.0
+          }
+        },
+        "02_position_prepare": {
+          "raw_ms": [
+            907.2624833400672,
+            886.627733358182,
+            882.1617666399106,
+            878.396216702337,
+            881.6827833264446
+          ],
+          "median_ms": 882.1617666399106,
+          "cumulative_speedup": 1.1848875087638178,
+          "incremental_speedup": 1.1848875087638178,
+          "physical_difference": {
+            "position": 0.0,
+            "orientation_radians": 0.0,
+            "linear_velocity": 0.0,
+            "angular_momentum": 0.0
+          }
+        },
+        "03_inverse_inertia": {
+          "raw_ms": [
+            709.715083319073,
+            700.5030833339939,
+            677.7084666925172,
+            777.3242666541288,
+            686.4398499795547
+          ],
+          "median_ms": 700.5030833339939,
+          "cumulative_speedup": 1.528753704040178,
+          "incremental_speedup": 1.2783474730410669,
+          "physical_difference": {
+            "position": 1.3552527156068805e-19,
+            "orientation_radians": 1.9046259522117278e-17,
+            "linear_velocity": 3.135512682828079e-16,
+            "angular_momentum": 7.655483777284366e-18
+          }
+        },
+        "04_ground_culling": {
+          "raw_ms": [
+            682.7623833281299,
+            705.3039333162209,
+            702.864516681681,
+            667.085999972187,
+            683.5458166509246
+          ],
+          "median_ms": 683.5458166509246,
+          "cumulative_speedup": 1.5283465880519433,
+          "incremental_speedup": 1.0042338542027944,
+          "physical_difference": {
+            "position": 1.3552527156068805e-19,
+            "orientation_radians": 1.9046259522117278e-17,
+            "linear_velocity": 3.135512682828079e-16,
+            "angular_momentum": 7.655483777284366e-18
+          }
+        },
+        "05_support_transform": {
+          "raw_ms": [
+            694.9756500155976,
+            677.0917333584899,
+            668.8920500067373,
+            677.4546333278219,
+            701.9892333385845
+          ],
+          "median_ms": 677.4546333278219,
+          "cumulative_speedup": 1.559238694294189,
+          "incremental_speedup": 0.9846947192541858,
+          "physical_difference": {
+            "position": 1.3552527156068805e-19,
+            "orientation_radians": 1.9046259522117278e-17,
+            "linear_velocity": 3.135512682828079e-16,
+            "angular_momentum": 7.655483777284366e-18
+          }
+        }
+      }
+    },
+    {
+      "case": "air",
+      "bodies": 500,
+      "steps_per_round": 2,
+      "rounds": 5,
+      "stages": {
+        "01_baseline": {
+          "raw_ms": [
+            271.0732499836013,
+            272.7122000651434,
+            271.40205004252493,
+            271.84645005036145,
+            279.3450499884784
+          ],
+          "median_ms": 271.84645005036145,
+          "cumulative_speedup": 1.0,
+          "incremental_speedup": 1.0,
+          "physical_difference": {
+            "position": 0.0,
+            "orientation_radians": 0.0,
+            "linear_velocity": 0.0,
+            "angular_momentum": 0.0
+          }
+        },
+        "02_position_prepare": {
+          "raw_ms": [
+            263.27949995175004,
+            275.7913999957964,
+            273.5880999825895,
+            259.60629992187023,
+            267.0927499420941
+          ],
+          "median_ms": 267.0927499420941,
+          "cumulative_speedup": 1.0296025707785055,
+          "incremental_speedup": 1.0296025707785055,
+          "physical_difference": {
+            "position": 0.0,
+            "orientation_radians": 0.0,
+            "linear_velocity": 0.0,
+            "angular_momentum": 0.0
+          }
+        },
+        "03_inverse_inertia": {
+          "raw_ms": [
+            258.25549999717623,
+            263.7822999386117,
+            269.16390005499125,
+            255.49020001199096,
+            257.447800016962
+          ],
+          "median_ms": 258.25549999717623,
+          "cumulative_speedup": 1.0496320503786567,
+          "incremental_speedup": 1.019453602942159,
+          "physical_difference": {
+            "position": 0.0,
+            "orientation_radians": 0.0,
+            "linear_velocity": 0.0,
+            "angular_momentum": 0.0
+          }
+        },
+        "04_ground_culling": {
+          "raw_ms": [
+            154.683250002563,
+            162.50930004753172,
+            147.37040002364665,
+            155.5402500089258,
+            149.4769499404356
+          ],
+          "median_ms": 154.683250002563,
+          "cumulative_speedup": 1.7524408750081846,
+          "incremental_speedup": 1.669576376193913,
+          "physical_difference": {
+            "position": 0.0,
+            "orientation_radians": 0.0,
+            "linear_velocity": 0.0,
+            "angular_momentum": 0.0
+          }
+        },
+        "05_support_transform": {
+          "raw_ms": [
+            146.82424999773502,
+            153.9427499519661,
+            153.02329999394715,
+            153.64320005755872,
+            153.4415999194607
+          ],
+          "median_ms": 153.4415999194607,
+          "cumulative_speedup": 1.7735995110108087,
+          "incremental_speedup": 1.012347112990724,
+          "physical_difference": {
+            "position": 0.0,
+            "orientation_radians": 0.0,
+            "linear_velocity": 0.0,
+            "angular_momentum": 0.0
+          }
+        }
+      }
+    },
+    {
+      "case": "impact",
+      "bodies": 500,
+      "steps_per_round": 1,
+      "rounds": 5,
+      "stages": {
+        "01_baseline": {
+          "raw_ms": [
+            798.2395999133587,
+            830.6456001009792,
+            789.9845999199897,
+            792.7641000133008,
+            817.6285000517964
+          ],
+          "median_ms": 798.2395999133587,
+          "cumulative_speedup": 1.0,
+          "incremental_speedup": 1.0,
+          "physical_difference": {
+            "position": 0.0,
+            "orientation_radians": 0.0,
+            "linear_velocity": 0.0,
+            "angular_momentum": 0.0
+          }
+        },
+        "02_position_prepare": {
+          "raw_ms": [
+            795.1126999687403,
+            785.2708001155406,
+            816.7512000072747,
+            804.9675000365824,
+            796.7410001438111
+          ],
+          "median_ms": 796.7410001438111,
+          "cumulative_speedup": 1.0039326499812433,
+          "incremental_speedup": 1.0039326499812433,
+          "physical_difference": {
+            "position": 0.0,
+            "orientation_radians": 0.0,
+            "linear_velocity": 0.0,
+            "angular_momentum": 0.0
+          }
+        },
+        "03_inverse_inertia": {
+          "raw_ms": [
+            636.2457999493927,
+            661.8892999831587,
+            664.8371000774205,
+            681.9335001055151,
+            608.6828999686986
+          ],
+          "median_ms": 661.8892999831587,
+          "cumulative_speedup": 1.2546088319590496,
+          "incremental_speedup": 1.2284982289829551,
+          "physical_difference": {
+            "position": 0.0,
+            "orientation_radians": 0.0,
+            "linear_velocity": 0.0,
+            "angular_momentum": 0.0
+          }
+        },
+        "04_ground_culling": {
+          "raw_ms": [
+            661.6729001980275,
+            686.7045001126826,
+            674.933300120756,
+            685.2214999962598,
+            647.0657999161631
+          ],
+          "median_ms": 674.933300120756,
+          "cumulative_speedup": 1.2063960903861395,
+          "incremental_speedup": 0.9638633500647631,
+          "physical_difference": {
+            "position": 0.0,
+            "orientation_radians": 0.0,
+            "linear_velocity": 0.0,
+            "angular_momentum": 0.0
+          }
+        },
+        "05_support_transform": {
+          "raw_ms": [
+            663.8269999530166,
+            667.6377998664975,
+            670.8837000187486,
+            667.3995999153703,
+            680.6226000189781
+          ],
+          "median_ms": 667.6377998664975,
+          "cumulative_speedup": 1.201294961449999,
+          "incremental_speedup": 1.0060362177556172,
+          "physical_difference": {
+            "position": 0.0,
+            "orientation_radians": 0.0,
+            "linear_velocity": 0.0,
+            "angular_momentum": 0.0
+          }
+        }
+      }
+    },
+    {
+      "case": "stack",
+      "bodies": 500,
+      "steps_per_round": 2,
+      "rounds": 5,
+      "stages": {
+        "01_baseline": {
+          "raw_ms": [
+            3982.5076499255374,
+            3834.857299923897,
+            3928.1067500123754,
+            3790.3105000732467,
+            3856.356549891643
+          ],
+          "median_ms": 3856.356549891643,
+          "cumulative_speedup": 1.0,
+          "incremental_speedup": 1.0,
+          "physical_difference": {
+            "position": 0.0,
+            "orientation_radians": 0.0,
+            "linear_velocity": 0.0,
+            "angular_momentum": 0.0
+          }
+        },
+        "02_position_prepare": {
+          "raw_ms": [
+            3399.2271000752226,
+            3321.4940500911325,
+            3249.901850009337,
+            3155.2942499984056,
+            3235.627649934031
+          ],
+          "median_ms": 3249.901850009337,
+          "cumulative_speedup": 1.191841882662323,
+          "incremental_speedup": 1.191841882662323,
+          "physical_difference": {
+            "position": 0.0,
+            "orientation_radians": 0.0,
+            "linear_velocity": 0.0,
+            "angular_momentum": 0.0
+          }
+        },
+        "03_inverse_inertia": {
+          "raw_ms": [
+            2568.6881500296295,
+            2537.9815499763936,
+            2495.682150009088,
+            2560.8620500424877,
+            2528.2700000097975
+          ],
+          "median_ms": 2537.9815499763936,
+          "cumulative_speedup": 1.5252945887411942,
+          "incremental_speedup": 1.3022098386998129,
+          "physical_difference": {
+            "position": 6.776263578034403e-20,
+            "orientation_radians": 2.3163524911011787e-19,
+            "linear_velocity": 1.3877787807814457e-17,
+            "angular_momentum": 2.0599841277224584e-18
+          }
+        },
+        "04_ground_culling": {
+          "raw_ms": [
+            2652.0352499792352,
+            2547.1425499999896,
+            2570.214100065641,
+            2544.362899963744,
+            2519.2190998932347
+          ],
+          "median_ms": 2547.1425499999896,
+          "cumulative_speedup": 1.5055526829167503,
+          "incremental_speedup": 0.9964034207572733,
+          "physical_difference": {
+            "position": 6.776263578034403e-20,
+            "orientation_radians": 2.3163524911011787e-19,
+            "linear_velocity": 1.3877787807814457e-17,
+            "angular_momentum": 2.0599841277224584e-18
+          }
+        },
+        "05_support_transform": {
+          "raw_ms": [
+            2597.4103999324143,
+            2572.131699998863,
+            2542.1078499639407,
+            2519.4169000023976,
+            2539.249550085515
+          ],
+          "median_ms": 2542.1078499639407,
+          "cumulative_speedup": 1.5186993140401548,
+          "incremental_speedup": 1.0099014974303469,
+          "physical_difference": {
+            "position": 6.776263578034403e-20,
+            "orientation_radians": 2.3163524911011787e-19,
+            "linear_velocity": 1.3877787807814457e-17,
+            "angular_momentum": 2.0599841277224584e-18
+          }
+        }
+      }
+    },
+    {
+      "case": "curved_demo",
+      "bodies": 5,
+      "steps_per_round": 6,
+      "rounds": 5,
+      "stages": {
+        "01_baseline": {
+          "raw_ms": [
+            69.27336667043467,
+            58.07571668022623,
+            68.72878332311909,
+            66.3091999789079,
+            59.01871668174863
+          ],
+          "median_ms": 66.3091999789079,
+          "cumulative_speedup": 1.0,
+          "incremental_speedup": 1.0,
+          "physical_difference": {
+            "position": 0.0,
+            "orientation_radians": 0.0,
+            "linear_velocity": 0.0,
+            "angular_momentum": 0.0
+          }
+        },
+        "02_position_prepare": {
+          "raw_ms": [
+            66.22223334852606,
+            62.26023333147168,
+            59.62823335236559,
+            59.47553335378567,
+            59.47408332334211
+          ],
+          "median_ms": 59.62823335236559,
+          "cumulative_speedup": 1.0460741531601716,
+          "incremental_speedup": 1.0460741531601716,
+          "physical_difference": {
+            "position": 0.0,
+            "orientation_radians": 0.0,
+            "linear_velocity": 0.0,
+            "angular_momentum": 0.0
+          }
+        },
+        "03_inverse_inertia": {
+          "raw_ms": [
+            61.70676668019345,
+            59.28219998410592,
+            61.642799992114305,
+            65.85358335481335,
+            61.089600009533264
+          ],
+          "median_ms": 61.642799992114305,
+          "cumulative_speedup": 1.0069186307089733,
+          "incremental_speedup": 0.9735549637591497,
+          "physical_difference": {
+            "position": 0.0,
+            "orientation_radians": 2.0816681711721685e-17,
+            "linear_velocity": 3.725318664660193e-16,
+            "angular_momentum": 2.0816681711721685e-17
+          }
+        },
+        "04_ground_culling": {
+          "raw_ms": [
+            61.62828331192335,
+            55.793816689401865,
+            59.66958329857638,
+            56.615533345999815,
+            58.19049997565647
+          ],
+          "median_ms": 58.19049997565647,
+          "cumulative_speedup": 1.1240515384765264,
+          "incremental_speedup": 1.0498208476484925,
+          "physical_difference": {
+            "position": 0.0,
+            "orientation_radians": 2.0816681711721685e-17,
+            "linear_velocity": 3.725318664660193e-16,
+            "angular_momentum": 2.0816681711721685e-17
+          }
+        },
+        "05_support_transform": {
+          "raw_ms": [
+            54.94688334874809,
+            53.17518332352241,
+            58.34096666270246,
+            54.6225499905025,
+            51.823666668497026
+          ],
+          "median_ms": 54.6225499905025,
+          "cumulative_speedup": 1.178053557468008,
+          "incremental_speedup": 1.049245403630251,
+          "physical_difference": {
+            "position": 0.0,
+            "orientation_radians": 2.0816681711721685e-17,
+            "linear_velocity": 3.725318664660193e-16,
+            "angular_momentum": 2.0816681711721685e-17
+          }
+        }
+      }
+    }
+  ]
+}

@@ -36,7 +36,7 @@ from src.geom.transform import TransformSpec
 from src.physics.body import RigidBody
 from src.physics.narrowphase import GroundPlane, detect_contacts
 from src.physics.toi import sphere_ground_toi, sphere_sphere_toi
-from src.physics.world import PhysicsWorld
+from src.physics.world import CollisionStepError, PhysicsWorld
 from src.scene.scene_spec import MaterialSpec, ObjectSpec, SceneSpec, SimulationSpec
 
 
@@ -198,7 +198,7 @@ def test_penetration_reduction() -> tuple[bool, str]:
 
 
 def test_event_cap_no_hang() -> tuple[bool, str]:
-    """事件数上限必须能防住病态场景（否则可能死循环）。"""
+    """预算不足时明确停止，不能靠跳过后续碰撞来限制事件数。"""
     radius = 0.3
     speed = 200.0
     bodies = [
@@ -209,14 +209,18 @@ def test_event_cap_no_hang() -> tuple[bool, str]:
     ]
     world = make_world(bodies, use_toi_splitting=True, max_events=1)
 
-    for _ in range(20):
+    stopped = False
+    try:
         world.step()
+    except CollisionStepError:
+        stopped = True
 
     finite = all(math.isfinite(c) for b in bodies for c in b.linear_velocity)
     capped = world.last_event_count <= 1
-    ok = finite and capped
+    ordered = all(a.position[0] < b.position[0] for a, b in zip(bodies, bodies[1:]))
+    ok = stopped and finite and capped and ordered
     return ok, (
-        f"max_events=1、四球 200 m/s：有限={finite}，末步事件数={world.last_event_count}，"
+        f"max_events=1、四球 200 m/s：明确停止={stopped}，有限={finite}，事件数={world.last_event_count}，"
         f"终态 vx={[round(b.linear_velocity[0], 2) for b in bodies]}"
     )
 

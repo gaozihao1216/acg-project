@@ -1,0 +1,63 @@
+test_broadphases_match_with_default_toi (__main__.CollisionReliabilityTests) ... ok
+test_budget_exhaustion_does_not_free_fly (__main__.CollisionReliabilityTests) ... ok
+test_budget_last_event_can_finish_if_no_more_hits (__main__.CollisionReliabilityTests) ... ok
+test_conservative_probes_have_separate_work_budget (__main__.CollisionReliabilityTests) ... ok
+test_curved_pair_near_contact (__main__.CollisionReliabilityTests) ... ok
+test_existing_contact_refreshes_swept_candidates (__main__.CollisionReliabilityTests) ... ok
+test_ground_culling_keeps_fast_falls_and_rotational_sweeps (__main__.CollisionReliabilityTests) ... ok
+test_ground_near_contact (__main__.CollisionReliabilityTests) ... ok
+test_polytope_pair_near_contact (__main__.CollisionReliabilityTests) ... ok
+test_rotated_thin_wall (__main__.CollisionReliabilityTests) ... ok
+test_sat_waits_for_all_separating_axes (__main__.CollisionReliabilityTests) ... ok
+test_sphere_thin_wall_near_contact (__main__.CollisionReliabilityTests) ... ok
+test_spheres_touching_and_subpicosecond_toi (__main__.CollisionReliabilityTests) ... ok
+test_touching_but_separating_has_no_event (__main__.CollisionReliabilityTests) ... ok
+
+----------------------------------------------------------------------
+Ran 14 tests in 0.089s
+
+OK
+========================================================================================
+凸包接触时刻预测（TOI）
+========================================================================================
+[PASS] 1. 盒子落地：顶点精确解
+       与解析解最大偏差 0.00e+00 s（0.218775 vs 解析 0.218750；0.150100 vs 解析 0.150000；1.800400 vs 解析 1.800000）
+[PASS] 2. 纯自转使用速度上界并早于解析首次接触
+       t=0.046280s，由角动量速度上界给出；推进下界加接触余量 0.046280s，偏差 1.39e-17（质心速度为 0）
+[PASS] 3. 盒-盒纯平移与解析解一致
+       8 组随机位姿：|t - 解析| ≤ 200 µm / 闭合速度（最多超出容差 0.00e+00 s）
+[PASS] 4. 不产生伪事件
+       远离=True，上升=True，已重叠=True，已陷入地面=True
+[PASS] 5. 仿真中穿透显著下降
+       盒子 11.462→1.314 mm，棱柱 10.533→1.475 mm，球 6.866→0.000 mm（纠正前）；位置纠正后峰值 0.840 mm < 1 mm
+[PASS] 6. 球走精确解、不吃余量
+       球-地面 0.437500000s（解析 0.437500000），球-球 1.000000000s（解析 1.000000000）——无 200 µm 余量
+----------------------------------------------------------------------------------------
+结果：6/6 通过
+========================================================================================
+========================================================================================
+组合体：质量属性 / 窄相 / TOI 验证
+========================================================================================
+[PASS] 1. 哑铃惯量与平行轴定理一致
+       主惯量=[0.001072, 0.017827, 0.017827]，解析=[0.001072, 0.017827, 0.017827]，最大误差=0.00e+00，体积=0.067021（解析 0.067021）
+[PASS] 2. 不等体积部件的质心解析正确
+       质心 x=0.035714（解析 0.035714），误差=0.00e+00 m
+[PASS] 3. 单部件组合体等于该图元
+       主惯量=[0.166666667, 0.133333333, 0.086666667]，图元=[0.166666667, 0.133333333, 0.086666667]，主轴四元数=(1.0, 0.0, 0.0, 0.0)
+[PASS] 4. 场景 JSON 支持组合体
+       解析=CompoundGeometry（2 部件），质量=2.0，1 s 后 z=0.1590，有限=True
+[PASS] 5. 哑铃横放落地能静置
+       静置 4s：z=0.2000（期望 0.2），高度误差=0.0 mm，速度=0.0011 m/s，角速度=0.0021 rad/s，最大穿透=0.00 mm
+[PASS] 6. T 形组合体立着不倒
+       静置 4s：z=0.2187（期望 0.2188），误差=-0.1 mm，倾斜分量=0.0001，速度=0.0000 m/s
+[PASS] 7. 两个部件同时接触都被报出
+       接触点=2，特征 ID=[0, 1000000]，部件命名空间=[0, 1]，不撞号=True
+[PASS] 8. 地面接触的特征 ID 不撞号
+       地面接触点=8，部件命名空间=[0, 1]，部件内唯一=True，跨部件不撞号=True
+[PASS] 9. 宽阶段 AABB 是部件并集
+       AABB=((0.422, 1.6969, 2.7656), (1.922, 2.3969, 3.2656))，误差=0.00e+00
+[PASS] 10. 自转复合体靠 ω×r 报出 TOI
+       逐部件 TOI=0.1 s（解析 0.1000 s），场景最早事件=0.1 s（质心线速度=0，能报出来只可能来自 v + ω × r）
+----------------------------------------------------------------------------------------
+结果：10/10 通过
+========================================================================================

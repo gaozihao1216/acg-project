@@ -1,23 +1,10 @@
 # -*- coding: utf-8 -*-
-"""物理世界：把刚体、窄相检测、求解器、积分器串成一步仿真。
+"""物理世界：外力、接触速度约束、CCD 与独立几何纠正。
 
-单步流程
---------
-每个子步（``physics_dt / substeps``）依次执行：
-
-1. **积分速度**：``v += g * h``（只对动态物体）
-2. **碰撞检测**：找出所有接触，生成接触流形
-3. **约束求解**：顺序冲量迭代修正速度，使接触满足非穿透 + 摩擦
-4. **积分位置**：``x += v * h``，姿态用四元数积分再归一化
-
-这个顺序（先速度后位置，即 semi-implicit / symplectic Euler）比显式欧拉
-稳定得多：接触冲量在**位置更新之前**就已经反映到速度里，物体不会先穿进去
-再被拉出来。代价是它仍然是一阶方法，但对本项目的尺度完全够用。
-
-为什么把检测放在积分速度之后
-----------------------------
-接触点的"碰撞前接近速度"必须包含本步重力的贡献。若先检测再加重力，
-快速下落时恢复系数会被低估，球会越弹越低——一个很隐蔽的 bug。
+每个子步先积分线速度与世界角动量，再按碰撞事件推进位姿、求解速度约束。
+位姿旋转采用固定世界角动量的中点积分；子步结束后执行一次 split-impulse
+几何纠正。完整 step 结束才清空外力/力矩，防止多子步重复或少算载荷。
+保守探测与真实接触事件分别限额；无法完成 CCD 时明确抛出异常。
 """
 
 from __future__ import annotations
@@ -37,7 +24,7 @@ from .narrowphase import (
     supported_pair,
 )
 from .solver import SequentialImpulseSolver
-from .toi import earliest_toi
+from .toi import earliest_toi_event
 from .validate import find_initial_overlaps, format_violations
 
 #: 小于该时长（秒）的剩余时间不再切分，直接推进。
@@ -47,6 +34,14 @@ _MIN_TIME = 1e-12
 #: 窄相只有在**真实穿透**时才报告接触，所以必须略微越过接触时刻，
 #: 让穿透量变成一个可被浮点数表示的正值。1e-8 秒在 20 m/s 下只有 0.2 微米。
 _TOI_NUDGE = 1e-8
+
+# 保守预测可能需要多次推进才真正接触，不能把这些探测都扣作碰撞事件。
+# 单独限制探测工作量，耗尽时明确停止，避免退化查询死循环。
+_MIN_TOI_ADVANCE_BUDGET = 64
+
+
+class CollisionStepError(RuntimeError):
+    """CCD 预算不足，子步未完成。状态已部分推进，调用者应停止并重新加载场景。"""
 
 
 class PhysicsWorld:
@@ -104,7 +99,7 @@ class PhysicsWorld:
 
         self.time = 0.0
         self.step_count = 0
-        #: 最近一个子步内触发了多少次 TOI 事件（用于诊断与性能评估）
+        #: 最近一个子步内由窄相确认的 TOI 接触事件数（不含尚未接触的保守探测）
         self.last_event_count = 0
         #: 最近一次宽阶段产生的候选对数（用于诊断与加速比分析）
         self.last_candidate_count = 0
@@ -240,29 +235,27 @@ class PhysicsWorld:
             if body.is_static:
                 continue
             body.linear_velocity = (
-                (body.linear_velocity[0] + gx * h) * linear_decay,
-                (body.linear_velocity[1] + gy * h) * linear_decay,
-                (body.linear_velocity[2] + gz * h) * linear_decay,
+                (body.linear_velocity[0] + (gx + body.force[0] * body.inv_mass) * h) * linear_decay,
+                (body.linear_velocity[1] + (gy + body.force[1] * body.inv_mass) * h) * linear_decay,
+                (body.linear_velocity[2] + (gz + body.force[2] * body.inv_mass) * h) * linear_decay,
             )
-            body.angular_velocity = vec3.scale(body.angular_velocity, angular_decay)
+            body.angular_momentum = vec3.scale(vec3.madd(body.angular_momentum, body.torque, h), angular_decay)
 
     def _integrate_positions(self, h: float) -> None:
-        """用求解后的速度更新位置与姿态。
-
-        姿态使用四元数一阶积分后归一化：
-
-            q ← normalize(q + 0.5 * h * (0, ω) ⊗ q)
-
-        归一化是必须的，否则模长漂移会让旋转逐渐失真。
-        """
+        """用线速度与固定世界角动量推进位姿；旋转由 RigidBody 的中点积分承担。"""
         for body in self.bodies:
             if body.is_static:
                 continue
-            body.position = vec3.madd(body.position, body.linear_velocity, h)
-            if body.angular_velocity != (0.0, 0.0, 0.0):
-                body.orientation = quat.quat_integrate(
-                    body.orientation, body.angular_velocity, h
-                )
+            body.integrate_pose(h)
+
+    def _current_contacts(self, pairs: list[tuple[int, int]] | None = None):
+        """查询当前位置的接触，并统一处理扫掠候选到当前候选的筛选。"""
+        if pairs is None:
+            pairs = self.broadphase.candidate_pairs(self.bodies)
+        else:
+            pairs = self._pairs_inside_now(pairs)
+        self.last_candidate_count = len(pairs)
+        return detect_contacts(self.bodies, self.ground, pairs)
 
     def _solve_current_contacts(
         self, h: float, pairs: list[tuple[int, int]] | None = None
@@ -276,13 +269,7 @@ class PhysicsWorld:
             （真实接触的超集），这里再用"此刻"的真实 AABB 筛一遍。
             传 None 时自行调用宽阶段，保持"一子步一次检测"的老路径不变。
         """
-        if pairs is None:
-            pairs = self.broadphase.candidate_pairs(self.bodies)
-        else:
-            pairs = self._pairs_inside_now(pairs)
-        self.last_candidate_count = len(pairs)
-
-        manifolds = detect_contacts(self.bodies, self.ground, pairs)
+        manifolds = self._current_contacts(pairs)
         if not manifolds:
             return 0
         return self.solver.solve(manifolds, self.get_body, h)
@@ -329,6 +316,8 @@ class PhysicsWorld:
         else:
             contact_count = self._solve_with_toi(h)
 
+        if self.solver.baumgarte > 0:
+            self.solver.solve_positions(self._current_contacts(), self.get_body, h)
         self.time += h
         return contact_count
 
@@ -350,10 +339,7 @@ class PhysicsWorld:
             if body.is_static:
                 inflation.append(0.0)
                 continue
-            omega = body.angular_velocity
-            spin = math.sqrt(
-                omega[0] * omega[0] + omega[1] * omega[1] + omega[2] * omega[2]
-            ) * body.bounding_radius
+            spin = body.angular_speed_bound * body.bounding_radius
             inflation.append((body.speed() + spin) * h)
         return self.broadphase.candidate_pairs(self.bodies, inflation=inflation)
 
@@ -377,8 +363,9 @@ class PhysicsWorld:
         为什么要限制事件数
         ------------------
         极端情况下（大量物体、密集布置）一个子步内可能有几十次事件，
-        逐个切分会显著拖慢仿真。达到上限后剩余时间一次性推进，
-        退化为传统做法——误差有界，且不会卡死。
+        逐个切分会显著拖慢仿真。只有预测物体对被窄相确认接触才扣碰撞事件预算；
+        保守探测另受 max(64, 16 × 事件预算) 的推进次数限制。达到任一上限后
+        若还有预测事件就抛出 CollisionStepError，禁止静默穿过后续障碍。
 
         参数
         ----
@@ -393,36 +380,54 @@ class PhysicsWorld:
         # 去撞下一个物体。若沿用事件前的候选对（那时它速度为 0、膨胀量也是 0），
         # 链条的第二环就查不到——牛顿摆只会飞出一个球。
         #
-        # 同一套候选对也喂给窄相（再按真实 AABB 筛一遍），省掉一整个子步里
-        # 那次重复的空间哈希。膨胀量覆盖了本子步内的全部位移，所以事件后
-        # 位置再怎么走，真实 AABB 都还在膨胀盒里面，不会漏。
+        # 同一套候选对也喂给窄相（再按真实 AABB 筛一遍）。它只对生成时的
+        # 速度有效；包括阶段 A 在内，任何接触求解都可能使它失效。
         pairs = self._swept_pairs(h)
 
         total = self._solve_current_contacts(h, pairs)
+        if total:
+            pairs = self._swept_pairs(h)
 
         remaining = h
         events = 0
+        advances = 0
         max_events = self.simulation.max_events_per_substep
+        max_advances = max(_MIN_TOI_ADVANCE_BUDGET, max_events * 16)
+        self.last_event_count = 0
 
-        while remaining > _MIN_TIME and events < max_events:
-            hit = earliest_toi(self.bodies, self.ground, remaining, pairs)
+        while remaining > _MIN_TIME:
+            hit = earliest_toi_event(self.bodies, self.ground, remaining, pairs)
             if hit is None:
                 # 剩余时间内不会再发生碰撞，直接走完
                 break
 
-            step_time = min(hit[0] + _TOI_NUDGE, remaining)
+            if events >= max_events or advances >= max_advances:
+                raise CollisionStepError(
+                    f"CCD exceeded max_events_per_substep={max_events} "
+                    f"or advancement budget={max_advances}; "
+                    f"events={events}, advances={advances}, remaining={remaining:.9g}s, "
+                    f"next={hit.label}. Reload the scene and increase "
+                    "max_events_per_substep or reduce physics_dt."
+                )
+
+            step_time = min(hit.time + _TOI_NUDGE, remaining)
             self._integrate_positions(step_time)
             remaining -= step_time
 
-            total += self._solve_current_contacts(h, pairs)
-            events += 1
-            if remaining > _MIN_TIME and events < max_events:
+            manifolds = self._current_contacts(pairs)
+            if manifolds:
+                total += self.solver.solve(manifolds, self.get_body, h)
+            # 既有地面接触不能把另一个物体对的保守探测伪装成实际撞击。
+            if any((m.body_a, m.body_b) == (hit.body_a, hit.body_b) for m in manifolds):
+                events += 1
+            advances += 1
+            self.last_event_count = events
+            if remaining > _MIN_TIME:
                 pairs = self._swept_pairs(remaining)
 
         if remaining > _MIN_TIME:
             self._integrate_positions(remaining)
 
-        self.last_event_count = events
         return total
 
     def step(self) -> int:
@@ -441,6 +446,8 @@ class PhysicsWorld:
         for _ in range(substeps):
             total += self.substep(h)
 
+        for body in self.bodies:
+            body.clear_forces()
         self.step_count += 1
         return total
 

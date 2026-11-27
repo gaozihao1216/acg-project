@@ -49,6 +49,7 @@ from src.physics.toi import (
     hull_hull_toi,
 )
 from src.physics.world import PhysicsWorld
+from src.physics.solver import SequentialImpulseSolver
 from src.scene.scene_spec import (
     BodyPhysicsSpec, GroundSpec, MaterialSpec, ObjectSpec, SceneSpec,
     SimulationSpec,
@@ -166,29 +167,26 @@ def test_ground_translation_exact() -> tuple[bool, str]:
 
 
 def test_ground_rotation_dominates() -> tuple[bool, str]:
-    """**纯自转**的盒子必须由顶点速度决定接触时刻。
+    """纯自转也必须报告推进时刻，并不晚于立方体匀速转动的解析首次接触。
 
-    质心速度为 0，若只用质心速度就会返回 None——而实际上是某个角在往下扫。
-    这道题专门排除"只考虑平移"的实现。
-
-    参数：底面在 z=0.1，绕 x 轴 ω=5 rad/s。
-    角点 r=(0, -0.25, -0.25) 的速度 (ω×r)_z = ω_x·r_y = 5×(-0.25) = -1.25 m/s，
-    所以 t ≈ (0.1 + 2e-4) / 1.25。
-    """
+立方体惯量各向同性，omega 恒定。最低角点高度为
+0.35 - 0.25 * (cos(theta) + sin(theta))，可独立求出首次接触。
+"""
     body = box(
         (0.5, 0.5, 0.5), (0.0, 0.0, 0.35),
         velocity=(0.0, 0.0, 0.0), angular=(5.0, 0.0, 0.0),
     )
     t = hull_ground_toi(body, GroundPlane(z=0.0), 10.0)
 
-    expected = (0.1 + _CONTACT_OVERLAP) / 1.25
+    expected = (0.1 + _CONTACT_OVERLAP) / (body.angular_speed_bound * body.bounding_radius)
     if t is None:
         return False, "纯自转的盒子被判定为永不触地（只看质心速度的实现会这样）"
 
-    ok = abs(t - expected) < 1e-12
+    analytic = (math.pi / 4 - math.acos(.35 / (.25 * math.sqrt(2)))) / 5
+    ok = abs(t - expected) < 1e-12 and 0 < t < analytic
     return ok, (
-        f"t={t:.6f}s，由角点下降速度 1.25 m/s 给出；"
-        f"解析 {expected:.6f}s，偏差 {abs(t - expected):.2e}（质心速度为 0）"
+        f"t={t:.6f}s，由角动量速度上界给出；"
+        f"推进下界加接触余量 {expected:.6f}s，偏差 {abs(t - expected):.2e}（质心速度为 0）"
     )
 
 
@@ -278,21 +276,34 @@ def test_penetration_improves_in_simulation() -> tuple[bool, str]:
     """
 
     def run(objects, toi_enabled):
+        class Recorder(SequentialImpulseSolver):
+            peak_uncorrected = 0.0
+
+            def solve_positions(self, manifolds, get_body, h):
+                # 在几何纠正前测 CCD 的穿透；否则纠正会掩盖离散检测的漏步误差。
+                self.peak_uncorrected = max(self.peak_uncorrected, max(
+                    (p.penetration for m in manifolds for p in m.points), default=0))
+                return super().solve_positions(manifolds, get_body, h)
+
         scene = SceneSpec(
             name="t", objects=objects, camera=None, lights=[],
             ground=GroundSpec(enabled=True),
             simulation=SimulationSpec(
                 enabled=True, physics_dt=1.0 / 240.0, substeps=3, iterations=8,
+                slop=0.0002, baumgarte=0.5,
                 ground_z=0.0, duration=1.0, use_toi_splitting=toi_enabled,
             ),
             render=None,
         )
         world = PhysicsWorld.from_scene(scene)
+        config = scene.simulation
+        world.solver = Recorder(iterations=config.iterations, slop=config.slop,
+                                baumgarte=config.baumgarte, restitution_threshold=config.restitution_threshold)
         worst = 0.0
         for _ in range(int(scene.simulation.duration / scene.simulation.physics_dt)):
             world.step()
             worst = max(worst, world.max_penetration())
-        return worst * 1000.0
+        return world.solver.peak_uncorrected * 1000.0, worst * 1000.0
 
     from src.geom.geometry import SphereGeometry
 
@@ -321,19 +332,20 @@ def test_penetration_improves_in_simulation() -> tuple[bool, str]:
     for label, objects in cases.items():
         measured[label] = (run(objects, False), run(objects, True))
 
-    box_off, box_on = measured["盒子"]
-    prism_off, prism_on = measured["棱柱"]
-    sphere_off, sphere_on = measured["球"]
+    (box_off, _), (box_on, box_corrected) = measured["盒子"]
+    (prism_off, _), (prism_on, prism_corrected) = measured["棱柱"]
+    (sphere_off, _), (sphere_on, sphere_corrected) = measured["球"]
 
     ok = (
         box_on < box_off * 0.3
         and prism_on < prism_off * 0.3
         and sphere_on <= sphere_off * 0.05
-        and max(box_on, prism_on, sphere_on) < 1.0
+        and max(box_corrected, prism_corrected, sphere_corrected) < 1.0
     )
     return ok, (
         f"盒子 {box_off:.3f}→{box_on:.3f} mm，棱柱 {prism_off:.3f}→{prism_on:.3f} mm，"
-        f"球 {sphere_off:.3f}→{sphere_on:.3f} mm（全部 < 1 mm）"
+        f"球 {sphere_off:.3f}→{sphere_on:.3f} mm（纠正前）；"
+        f"位置纠正后峰值 {max(box_corrected, prism_corrected, sphere_corrected):.3f} mm < 1 mm"
     )
 
 
@@ -371,7 +383,7 @@ def test_sphere_path_unchanged() -> tuple[bool, str]:
 
 CHECKS = [
     ("1. 盒子落地：顶点精确解", test_ground_translation_exact),
-    ("2. 纯自转由顶点速度决定", test_ground_rotation_dominates),
+    ("2. 纯自转使用速度上界并早于解析首次接触", test_ground_rotation_dominates),
     ("3. 盒-盒纯平移与解析解一致", test_hull_translation_exact),
     ("4. 不产生伪事件", test_no_false_events),
     ("5. 仿真中穿透显著下降", test_penetration_improves_in_simulation),

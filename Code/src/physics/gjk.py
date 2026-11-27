@@ -35,6 +35,7 @@ from __future__ import annotations
 import math
 
 from ..mathutils import vec3
+from .contact_cache import local_point
 from . import patch as patch_module
 from .contact import ContactPoint
 from .support import TAG_LIMIT, feature_world_tagged, support_world
@@ -762,6 +763,8 @@ def _build_manifold(body_a, body_b, normal, depth, witnesses=None) -> list[Conta
                 normal=normal,
                 penetration=anchor.penetration,
                 feature_id=tag_a * TAG_LIMIT + tag_b,
+                local_anchor_a=local_point(body_a, anchor.point_a),
+                local_anchor_b=local_point(body_b, anchor.point_b),
             )
             for anchor, tag_a, tag_b in zip(anchors, tags_a, tags_b)
         ]

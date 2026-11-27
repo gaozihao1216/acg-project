@@ -153,18 +153,36 @@ def support_local(geometry, direction) -> tuple[float, float, float]:
     return geometry.support(direction)
 
 
+def _rotation(body):
+    """Share normalized forward/inverse quaternions across samples of one pose.
+
+    Translation and geometry remain live inputs; only the rotation is cached.
+    Value keys also catch direct pose assignments and in-place sequence edits.
+    """
+    key = tuple(body.orientation)
+    cached = getattr(body, "_support_rotation", None)
+    if cached is None or cached[0] != key:
+        forward = quat.quat_normalize(key)
+        cached = (key, forward, quat.quat_conjugate(forward))
+        try:
+            body._support_rotation = cached
+        except AttributeError:
+            pass  # Foreign read-only body views still support correct queries.
+    return cached[1], cached[2]
+
+
 def support_world(body, direction) -> tuple[float, float, float]:
     """刚体在世界坐标下沿 ``direction`` 的最远点。"""
-    inverse = quat.quat_conjugate(body.orientation)
-    local_direction = quat.quat_rotate_vector(inverse, direction)
+    forward, inverse = _rotation(body)
+    local_direction = quat.quat_rotate_vector_unit(inverse, direction)
     local_point = support_local(body.geometry, local_direction)
-    world = quat.quat_rotate_vector(body.orientation, local_point)
+    world = quat.quat_rotate_vector_unit(forward, local_point)
     return (world[0] + body.position[0], world[1] + body.position[1], world[2] + body.position[2])
 
 
 def world_axis(body) -> tuple[float, float, float]:
     """柱/胶囊的轴线在世界坐标下的方向（局部 +Z 的像）。"""
-    return quat.quat_rotate_vector(body.orientation, (0.0, 0.0, 1.0))
+    return quat.quat_rotate_vector_unit(_rotation(body)[0], (0.0, 0.0, 1.0))
 
 
 def feature_world(
@@ -415,8 +433,8 @@ def _feature_branches(
     if isinstance(geometry, BoxGeometry):
         size = geometry.size
         half = (0.5 * size[0], 0.5 * size[1], 0.5 * size[2])
-        local_direction = quat.quat_rotate_vector(
-            quat.quat_conjugate(body.orientation), direction
+        local_direction = quat.quat_rotate_vector_unit(
+            _rotation(body)[1], direction
         )
         best = (
             abs(local_direction[0]) * half[0]
@@ -441,8 +459,8 @@ def _feature_branches(
         return points
 
     if isinstance(geometry, ConvexHullGeometry):
-        local_direction = quat.quat_rotate_vector(
-            quat.quat_conjugate(body.orientation), direction
+        local_direction = quat.quat_rotate_vector_unit(
+            _rotation(body)[1], direction
         )
         scored = [
             (
@@ -532,8 +550,8 @@ def _ring_basis(body):
     采样点与改造前逐位相同，把这次改动的影响限制在"带姿态的物体"上。
     """
     return (
-        quat.quat_rotate_vector(body.orientation, (0.0, 1.0, 0.0)),
-        quat.quat_rotate_vector(body.orientation, (-1.0, 0.0, 0.0)),
+        quat.quat_rotate_vector_unit(_rotation(body)[0], (0.0, 1.0, 0.0)),
+        quat.quat_rotate_vector_unit(_rotation(body)[0], (-1.0, 0.0, 0.0)),
     )
 
 
@@ -618,7 +636,7 @@ def _face_ring_tagged(body, center_local_z: float, radius: float, base_tag: int)
 
 def _local_to_world(body, point) -> tuple[float, float, float]:
     """局部坐标点 → 世界坐标点。"""
-    world = quat.quat_rotate_vector(body.orientation, point)
+    world = quat.quat_rotate_vector_unit(_rotation(body)[0], point)
     return (world[0] + body.position[0], world[1] + body.position[1], world[2] + body.position[2])
 
 

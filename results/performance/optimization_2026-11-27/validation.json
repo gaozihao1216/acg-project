@@ -1,0 +1,14 @@
+{
+  "test_modules": 28,
+  "checks": 274,
+  "paired_loads": 13,
+  "rounds": 5,
+  "maximum_state_difference": {
+    "position": 1.3552527156068805e-19,
+    "orientation_radians": 2.0816681711721685e-17,
+    "linear_velocity": 3.725318664660193e-16,
+    "angular_momentum": 2.0816681711721685e-17
+  },
+  "source_archives_verified": true,
+  "final_source_fingerprint_verified": true
+}

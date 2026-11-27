@@ -1,0 +1,84 @@
+         568711 function calls in 0.454 seconds
+
+   Ordered by: cumulative time
+   List reduced from 63 to 35 due to restriction <35>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+        6    0.000    0.000    0.454    0.076 D:\清华课程\大一上\高等计算机图形学\project\Code\src\physics\world.py:433(step)
+       18    0.000    0.000    0.454    0.025 D:\清华课程\大一上\高等计算机图形学\project\Code\src\physics\world.py:303(substep)
+       36    0.001    0.000    0.333    0.009 D:\清华课程\大一上\高等计算机图形学\project\Code\src\physics\world.py:251(_current_contacts)
+       18    0.000    0.000    0.269    0.015 D:\清华课程\大一上\高等计算机图形学\project\Code\src\physics\world.py:346(_solve_with_toi)
+       36    0.009    0.000    0.215    0.006 D:\清华课程\大一上\高等计算机图形学\project\Code\src\physics\narrowphase.py:893(detect_contacts)
+     4500    0.007    0.000    0.204    0.000 D:\清华课程\大一上\高等计算机图形学\project\Code\src\physics\narrowphase.py:508(_part_ground_points)
+     4500    0.039    0.000    0.188    0.000 D:\清华课程\大一上\高等计算机图形学\project\Code\src\physics\narrowphase.py:304(collide_box_ground)
+    56250    0.083    0.000    0.158    0.000 D:\清华课程\大一上\高等计算机图形学\project\Code\src\mathutils\quaternion.py:157(quat_rotate_vector)
+       18    0.000    0.000    0.156    0.009 D:\清华课程\大一上\高等计算机图形学\project\Code\src\physics\world.py:260(_solve_current_contacts)
+       36    0.012    0.000    0.153    0.004 D:\清华课程\大一上\高等计算机图形学\project\Code\src\physics\broadphase.py:305(candidate_pairs)
+    36000    0.030    0.000    0.146    0.000 D:\清华课程\大一上\高等计算机图形学\project\Code\src\physics\narrowphase.py:153(_local_to_world)
+     6750    0.027    0.000    0.128    0.000 D:\清华课程\大一上\高等计算机图形学\project\Code\src\physics\broadphase.py:101(world_aabb)
+       18    0.004    0.000    0.097    0.005 D:\清华课程\大一上\高等计算机图形学\project\Code\src\physics\world.py:324(_swept_pairs)
+       36    0.005    0.000    0.091    0.003 D:\清华课程\大一上\高等计算机图形学\project\Code\src\physics\broadphase.py:329(<listcomp>)
+    56250    0.066    0.000    0.075    0.000 D:\清华课程\大一上\高等计算机图形学\project\Code\src\mathutils\quaternion.py:44(quat_normalize)
+     6750    0.010    0.000    0.068    0.000 D:\清华课程\大一上\高等计算机图形学\project\Code\src\physics\broadphase.py:142(<listcomp>)
+       18    0.000    0.000    0.044    0.002 D:\清华课程\大一上\高等计算机图形学\project\Code\src\physics\world.py:277(_pairs_inside_now)
+       18    0.002    0.000    0.044    0.002 D:\清华课程\大一上\高等计算机图形学\project\Code\src\physics\world.py:296(<listcomp>)
+     4500    0.012    0.000    0.041    0.000 D:\清华课程\大一上\高等计算机图形学\project\Code\src\physics\broadphase.py:287(_keys_for)
+     6750    0.018    0.000    0.024    0.000 D:\清华课程\大一上\高等计算机图形学\project\Code\src\physics\broadphase.py:146(<listcomp>)
+    13500    0.009    0.000    0.023    0.000 D:\清华课程\大一上\高等计算机图形学\project\Code\src\physics\broadphase.py:283(_cell_range)
+    36000    0.016    0.000    0.016    0.000 D:\清华课程\大一上\高等计算机图形学\project\Code\src\mathutils\vec3.py:27(add)
+    27000    0.011    0.000    0.014    0.000 D:\清华课程\大一上\高等计算机图形学\project\Code\src\physics\broadphase.py:279(_cell_index)
+       18    0.001    0.000    0.012    0.001 D:\清华课程\大一上\高等计算机图形学\project\Code\src\physics\toi.py:793(earliest_toi_event)
+    67500    0.011    0.000    0.011    0.000 {built-in method math.sqrt}
+     4500    0.006    0.000    0.008    0.000 D:\清华课程\大一上\高等计算机图形学\project\Code\src\physics\capabilities.py:280(kind_of)
+     6750    0.003    0.000    0.008    0.000 D:\清华课程\大一上\高等计算机图形学\project\Code\src\physics\body.py:214(bounding_radius)
+     9000    0.008    0.000    0.008    0.000 <string>:2(__init__)
+       18    0.005    0.000    0.007    0.000 D:\清华课程\大一上\高等计算机图形学\project\Code\src\physics\world.py:214(_integrate_velocities)
+     2250    0.003    0.000    0.006    0.000 D:\清华课程\大一上\高等计算机图形学\project\Code\src\physics\toi.py:759(ground_toi)
+    60750    0.006    0.000    0.006    0.000 {built-in method builtins.abs}
+    36000    0.006    0.000    0.006    0.000 {built-in method builtins.isinstance}
+     6750    0.004    0.000    0.005    0.000 D:\清华课程\大一上\高等计算机图形学\project\Code\src\geom\geometry.py:187(bounding_radius)
+     2250    0.002    0.000    0.005    0.000 D:\清华课程\大一上\高等计算机图形学\project\Code\src\physics\body.py:171(angular_speed_bound)
+       18    0.003    0.000    0.005    0.000 D:\清华课程\大一上\高等计算机图形学\project\Code\src\physics\toi.py:829(<listcomp>)
+
+
+         568711 function calls in 0.454 seconds
+
+   Ordered by: internal time
+   List reduced from 63 to 35 due to restriction <35>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+    56250    0.083    0.000    0.158    0.000 D:\清华课程\大一上\高等计算机图形学\project\Code\src\mathutils\quaternion.py:157(quat_rotate_vector)
+    56250    0.066    0.000    0.075    0.000 D:\清华课程\大一上\高等计算机图形学\project\Code\src\mathutils\quaternion.py:44(quat_normalize)
+     4500    0.039    0.000    0.188    0.000 D:\清华课程\大一上\高等计算机图形学\project\Code\src\physics\narrowphase.py:304(collide_box_ground)
+    36000    0.030    0.000    0.146    0.000 D:\清华课程\大一上\高等计算机图形学\project\Code\src\physics\narrowphase.py:153(_local_to_world)
+     6750    0.027    0.000    0.128    0.000 D:\清华课程\大一上\高等计算机图形学\project\Code\src\physics\broadphase.py:101(world_aabb)
+     6750    0.018    0.000    0.024    0.000 D:\清华课程\大一上\高等计算机图形学\project\Code\src\physics\broadphase.py:146(<listcomp>)
+    36000    0.016    0.000    0.016    0.000 D:\清华课程\大一上\高等计算机图形学\project\Code\src\mathutils\vec3.py:27(add)
+     4500    0.012    0.000    0.041    0.000 D:\清华课程\大一上\高等计算机图形学\project\Code\src\physics\broadphase.py:287(_keys_for)
+       36    0.012    0.000    0.153    0.004 D:\清华课程\大一上\高等计算机图形学\project\Code\src\physics\broadphase.py:305(candidate_pairs)
+    67500    0.011    0.000    0.011    0.000 {built-in method math.sqrt}
+    27000    0.011    0.000    0.014    0.000 D:\清华课程\大一上\高等计算机图形学\project\Code\src\physics\broadphase.py:279(_cell_index)
+     6750    0.010    0.000    0.068    0.000 D:\清华课程\大一上\高等计算机图形学\project\Code\src\physics\broadphase.py:142(<listcomp>)
+    13500    0.009    0.000    0.023    0.000 D:\清华课程\大一上\高等计算机图形学\project\Code\src\physics\broadphase.py:283(_cell_range)
+       36    0.009    0.000    0.215    0.006 D:\清华课程\大一上\高等计算机图形学\project\Code\src\physics\narrowphase.py:893(detect_contacts)
+     9000    0.008    0.000    0.008    0.000 <string>:2(__init__)
+     4500    0.007    0.000    0.204    0.000 D:\清华课程\大一上\高等计算机图形学\project\Code\src\physics\narrowphase.py:508(_part_ground_points)
+    60750    0.006    0.000    0.006    0.000 {built-in method builtins.abs}
+     4500    0.006    0.000    0.008    0.000 D:\清华课程\大一上\高等计算机图形学\project\Code\src\physics\capabilities.py:280(kind_of)
+    36000    0.006    0.000    0.006    0.000 {built-in method builtins.isinstance}
+       36    0.005    0.000    0.091    0.003 D:\清华课程\大一上\高等计算机图形学\project\Code\src\physics\broadphase.py:329(<listcomp>)
+       18    0.005    0.000    0.007    0.000 D:\清华课程\大一上\高等计算机图形学\project\Code\src\physics\world.py:214(_integrate_velocities)
+       18    0.004    0.000    0.097    0.005 D:\清华课程\大一上\高等计算机图形学\project\Code\src\physics\world.py:324(_swept_pairs)
+     6750    0.004    0.000    0.005    0.000 D:\清华课程\大一上\高等计算机图形学\project\Code\src\geom\geometry.py:187(bounding_radius)
+    20268    0.004    0.000    0.004    0.000 {method 'get' of 'dict' objects}
+     4500    0.004    0.000    0.004    0.000 D:\清华课程\大一上\高等计算机图形学\project\Code\src\physics\broadphase.py:296(<listcomp>)
+     4500    0.003    0.000    0.004    0.000 D:\清华课程\大一上\高等计算机图形学\project\Code\src\mathutils\vec3.py:73(length)
+    29502    0.003    0.000    0.003    0.000 {built-in method builtins.len}
+    27000    0.003    0.000    0.003    0.000 {built-in method math.floor}
+       18    0.003    0.000    0.004    0.000 D:\清华课程\大一上\高等计算机图形学\project\Code\src\physics\broadphase.py:331(<listcomp>)
+     6750    0.003    0.000    0.008    0.000 D:\清华课程\大一上\高等计算机图形学\project\Code\src\physics\body.py:214(bounding_radius)
+       18    0.003    0.000    0.005    0.000 D:\清华课程\大一上\高等计算机图形学\project\Code\src\physics\toi.py:829(<listcomp>)
+     2250    0.003    0.000    0.006    0.000 D:\清华课程\大一上\高等计算机图形学\project\Code\src\physics\toi.py:759(ground_toi)
+     2250    0.002    0.000    0.005    0.000 D:\清华课程\大一上\高等计算机图形学\project\Code\src\physics\body.py:171(angular_speed_bound)
+     4500    0.002    0.000    0.002    0.000 D:\清华课程\大一上\高等计算机图形学\project\Code\src\mathutils\vec3.py:46(madd)
+     4500    0.002    0.000    0.002    0.000 D:\清华课程\大一上\高等计算机图形学\project\Code\src\physics\narrowphase.py:137(_box_half_extents)

@@ -1,0 +1,860 @@
+[
+  {
+    "case": "air",
+    "bodies": 10,
+    "stages": {
+      "01_baseline": {
+        "ms": 2.115699928253889,
+        "cumulative_speedup": 1.0,
+        "incremental_speedup": null,
+        "bitwise_equal": true,
+        "physical_difference": {
+          "position": 0.0,
+          "orientation_radians": 0.0,
+          "linear_velocity": 0.0,
+          "angular_momentum": 0.0
+        }
+      },
+      "02_position_prepare": {
+        "ms": 3.4275499638170004,
+        "cumulative_speedup": 0.6172630452038096,
+        "incremental_speedup": 0.6172630452038096,
+        "bitwise_equal": true,
+        "physical_difference": {
+          "position": 0.0,
+          "orientation_radians": 0.0,
+          "linear_velocity": 0.0,
+          "angular_momentum": 0.0
+        }
+      },
+      "03_inverse_inertia": {
+        "ms": 1.9537500338628888,
+        "cumulative_speedup": 1.0828918191089156,
+        "incremental_speedup": 1.7543441609263413,
+        "bitwise_equal": true,
+        "physical_difference": {
+          "position": 0.0,
+          "orientation_radians": 0.0,
+          "linear_velocity": 0.0,
+          "angular_momentum": 0.0
+        }
+      },
+      "04_ground_culling": {
+        "ms": 1.2331500183790922,
+        "cumulative_speedup": 1.7156873833038255,
+        "incremental_speedup": 1.5843571380155235,
+        "bitwise_equal": true,
+        "physical_difference": {
+          "position": 0.0,
+          "orientation_radians": 0.0,
+          "linear_velocity": 0.0,
+          "angular_momentum": 0.0
+        }
+      },
+      "05_support_transform": {
+        "ms": 1.5928499633446336,
+        "cumulative_speedup": 1.328248094259541,
+        "incremental_speedup": 0.7741783888984429,
+        "bitwise_equal": true,
+        "physical_difference": {
+          "position": 0.0,
+          "orientation_radians": 0.0,
+          "linear_velocity": 0.0,
+          "angular_momentum": 0.0
+        }
+      }
+    }
+  },
+  {
+    "case": "impact",
+    "bodies": 10,
+    "stages": {
+      "01_baseline": {
+        "ms": 6.448199972510338,
+        "cumulative_speedup": 1.0,
+        "incremental_speedup": null,
+        "bitwise_equal": true,
+        "physical_difference": {
+          "position": 0.0,
+          "orientation_radians": 0.0,
+          "linear_velocity": 0.0,
+          "angular_momentum": 0.0
+        }
+      },
+      "02_position_prepare": {
+        "ms": 12.22790009342134,
+        "cumulative_speedup": 0.5273350226323402,
+        "incremental_speedup": 0.5273350226323402,
+        "bitwise_equal": true,
+        "physical_difference": {
+          "position": 0.0,
+          "orientation_radians": 0.0,
+          "linear_velocity": 0.0,
+          "angular_momentum": 0.0
+        }
+      },
+      "03_inverse_inertia": {
+        "ms": 5.6952000595629215,
+        "cumulative_speedup": 1.1322165867875071,
+        "incremental_speedup": 2.147053653170486,
+        "bitwise_equal": true,
+        "physical_difference": {
+          "position": 0.0,
+          "orientation_radians": 0.0,
+          "linear_velocity": 0.0,
+          "angular_momentum": 0.0
+        }
+      },
+      "04_ground_culling": {
+        "ms": 5.332199856638908,
+        "cumulative_speedup": 1.2092945024335393,
+        "incremental_speedup": 1.0680770062420029,
+        "bitwise_equal": true,
+        "physical_difference": {
+          "position": 0.0,
+          "orientation_radians": 0.0,
+          "linear_velocity": 0.0,
+          "angular_momentum": 0.0
+        }
+      },
+      "05_support_transform": {
+        "ms": 9.23970015719533,
+        "cumulative_speedup": 0.697879786444029,
+        "incremental_speedup": 0.5770966336484965,
+        "bitwise_equal": true,
+        "physical_difference": {
+          "position": 0.0,
+          "orientation_radians": 0.0,
+          "linear_velocity": 0.0,
+          "angular_momentum": 0.0
+        }
+      }
+    }
+  },
+  {
+    "case": "stack",
+    "bodies": 10,
+    "stages": {
+      "01_baseline": {
+        "ms": 41.20520001742989,
+        "cumulative_speedup": 1.0,
+        "incremental_speedup": null,
+        "bitwise_equal": true,
+        "physical_difference": {
+          "position": 0.0,
+          "orientation_radians": 0.0,
+          "linear_velocity": 0.0,
+          "angular_momentum": 0.0
+        }
+      },
+      "02_position_prepare": {
+        "ms": 54.44900004658848,
+        "cumulative_speedup": 0.7567668824436311,
+        "incremental_speedup": 0.7567668824436311,
+        "bitwise_equal": true,
+        "physical_difference": {
+          "position": 0.0,
+          "orientation_radians": 0.0,
+          "linear_velocity": 0.0,
+          "angular_momentum": 0.0
+        }
+      },
+      "03_inverse_inertia": {
+        "ms": 23.28770002350211,
+        "cumulative_speedup": 1.7693975779422317,
+        "incremental_speedup": 2.338101229045297,
+        "bitwise_equal": false,
+        "physical_difference": {
+          "position": 8.131516293641283e-20,
+          "orientation_radians": 1.6660515812468967e-19,
+          "linear_velocity": 5.204170427930421e-18,
+          "angular_momentum": 4.87890977618477e-19
+        }
+      },
+      "04_ground_culling": {
+        "ms": 24.890050059184432,
+        "cumulative_speedup": 1.6554888366817553,
+        "incremental_speedup": 0.9356228680990116,
+        "bitwise_equal": false,
+        "physical_difference": {
+          "position": 8.131516293641283e-20,
+          "orientation_radians": 1.6660515812468967e-19,
+          "linear_velocity": 5.204170427930421e-18,
+          "angular_momentum": 4.87890977618477e-19
+        }
+      },
+      "05_support_transform": {
+        "ms": 37.104900111444294,
+        "cumulative_speedup": 1.1105056176858144,
+        "incremental_speedup": 0.6708022386376826,
+        "bitwise_equal": false,
+        "physical_difference": {
+          "position": 8.131516293641283e-20,
+          "orientation_radians": 1.6660515812468967e-19,
+          "linear_velocity": 5.204170427930421e-18,
+          "angular_momentum": 4.87890977618477e-19
+        }
+      }
+    }
+  },
+  {
+    "case": "air",
+    "bodies": 50,
+    "stages": {
+      "01_baseline": {
+        "ms": 12.0749999769032,
+        "cumulative_speedup": 1.0,
+        "incremental_speedup": null,
+        "bitwise_equal": true,
+        "physical_difference": {
+          "position": 0.0,
+          "orientation_radians": 0.0,
+          "linear_velocity": 0.0,
+          "angular_momentum": 0.0
+        }
+      },
+      "02_position_prepare": {
+        "ms": 21.9878499628976,
+        "cumulative_speedup": 0.5491669261559731,
+        "incremental_speedup": 0.5491669261559731,
+        "bitwise_equal": true,
+        "physical_difference": {
+          "position": 0.0,
+          "orientation_radians": 0.0,
+          "linear_velocity": 0.0,
+          "angular_momentum": 0.0
+        }
+      },
+      "03_inverse_inertia": {
+        "ms": 11.230400064960122,
+        "cumulative_speedup": 1.0752065738582464,
+        "incremental_speedup": 1.9578866145206801,
+        "bitwise_equal": true,
+        "physical_difference": {
+          "position": 0.0,
+          "orientation_radians": 0.0,
+          "linear_velocity": 0.0,
+          "angular_momentum": 0.0
+        }
+      },
+      "04_ground_culling": {
+        "ms": 6.186400074511766,
+        "cumulative_speedup": 1.9518621219879906,
+        "incremental_speedup": 1.8153368566041908,
+        "bitwise_equal": true,
+        "physical_difference": {
+          "position": 0.0,
+          "orientation_radians": 0.0,
+          "linear_velocity": 0.0,
+          "angular_momentum": 0.0
+        }
+      },
+      "05_support_transform": {
+        "ms": 12.65205000527203,
+        "cumulative_speedup": 0.9543907882020402,
+        "incremental_speedup": 0.48896424468239785,
+        "bitwise_equal": true,
+        "physical_difference": {
+          "position": 0.0,
+          "orientation_radians": 0.0,
+          "linear_velocity": 0.0,
+          "angular_momentum": 0.0
+        }
+      }
+    }
+  },
+  {
+    "case": "impact",
+    "bodies": 50,
+    "stages": {
+      "01_baseline": {
+        "ms": 41.240200167521834,
+        "cumulative_speedup": 1.0,
+        "incremental_speedup": null,
+        "bitwise_equal": true,
+        "physical_difference": {
+          "position": 0.0,
+          "orientation_radians": 0.0,
+          "linear_velocity": 0.0,
+          "angular_momentum": 0.0
+        }
+      },
+      "02_position_prepare": {
+        "ms": 71.07720011845231,
+        "cumulative_speedup": 0.5802170048734867,
+        "incremental_speedup": 0.5802170048734867,
+        "bitwise_equal": true,
+        "physical_difference": {
+          "position": 0.0,
+          "orientation_radians": 0.0,
+          "linear_velocity": 0.0,
+          "angular_momentum": 0.0
+        }
+      },
+      "03_inverse_inertia": {
+        "ms": 31.537200091406703,
+        "cumulative_speedup": 1.3076684058189116,
+        "incremental_speedup": 2.2537574645955814,
+        "bitwise_equal": true,
+        "physical_difference": {
+          "position": 0.0,
+          "orientation_radians": 0.0,
+          "linear_velocity": 0.0,
+          "angular_momentum": 0.0
+        }
+      },
+      "04_ground_culling": {
+        "ms": 28.874500188976526,
+        "cumulative_speedup": 1.4282567628050644,
+        "incremental_speedup": 1.0922163114514003,
+        "bitwise_equal": true,
+        "physical_difference": {
+          "position": 0.0,
+          "orientation_radians": 0.0,
+          "linear_velocity": 0.0,
+          "angular_momentum": 0.0
+        }
+      },
+      "05_support_transform": {
+        "ms": 56.40299990773201,
+        "cumulative_speedup": 0.7311703319856293,
+        "incremental_speedup": 0.5119319936211099,
+        "bitwise_equal": true,
+        "physical_difference": {
+          "position": 0.0,
+          "orientation_radians": 0.0,
+          "linear_velocity": 0.0,
+          "angular_momentum": 0.0
+        }
+      }
+    }
+  },
+  {
+    "case": "stack",
+    "bodies": 50,
+    "stages": {
+      "01_baseline": {
+        "ms": 201.5934499213472,
+        "cumulative_speedup": 1.0,
+        "incremental_speedup": null,
+        "bitwise_equal": true,
+        "physical_difference": {
+          "position": 0.0,
+          "orientation_radians": 0.0,
+          "linear_velocity": 0.0,
+          "angular_momentum": 0.0
+        }
+      },
+      "02_position_prepare": {
+        "ms": 357.679900014773,
+        "cumulative_speedup": 0.5636141418990022,
+        "incremental_speedup": 0.5636141418990022,
+        "bitwise_equal": true,
+        "physical_difference": {
+          "position": 0.0,
+          "orientation_radians": 0.0,
+          "linear_velocity": 0.0,
+          "angular_momentum": 0.0
+        }
+      },
+      "03_inverse_inertia": {
+        "ms": 140.087450039573,
+        "cumulative_speedup": 1.4390543183161624,
+        "incremental_speedup": 2.5532615513647565,
+        "bitwise_equal": false,
+        "physical_difference": {
+          "position": 1.3552527156068805e-19,
+          "orientation_radians": 2.249984827884238e-19,
+          "linear_velocity": 9.540979117872439e-18,
+          "angular_momentum": 6.166399856011306e-19
+        }
+      },
+      "04_ground_culling": {
+        "ms": 146.39444998465478,
+        "cumulative_speedup": 1.3770566434894111,
+        "incremental_speedup": 0.9569177660372857,
+        "bitwise_equal": false,
+        "physical_difference": {
+          "position": 1.3552527156068805e-19,
+          "orientation_radians": 2.249984827884238e-19,
+          "linear_velocity": 9.540979117872439e-18,
+          "angular_momentum": 6.166399856011306e-19
+        }
+      },
+      "05_support_transform": {
+        "ms": 282.09564997814596,
+        "cumulative_speedup": 0.7146279991802947,
+        "incremental_speedup": 0.5189532344649626,
+        "bitwise_equal": false,
+        "physical_difference": {
+          "position": 1.3552527156068805e-19,
+          "orientation_radians": 2.249984827884238e-19,
+          "linear_velocity": 9.540979117872439e-18,
+          "angular_momentum": 6.166399856011306e-19
+        }
+      }
+    }
+  },
+  {
+    "case": "air",
+    "bodies": 125,
+    "stages": {
+      "01_baseline": {
+        "ms": 30.250700074248016,
+        "cumulative_speedup": 1.0,
+        "incremental_speedup": null,
+        "bitwise_equal": true,
+        "physical_difference": {
+          "position": 0.0,
+          "orientation_radians": 0.0,
+          "linear_velocity": 0.0,
+          "angular_momentum": 0.0
+        }
+      },
+      "02_position_prepare": {
+        "ms": 62.913249945268035,
+        "cumulative_speedup": 0.4808319408163605,
+        "incremental_speedup": 0.4808319408163605,
+        "bitwise_equal": true,
+        "physical_difference": {
+          "position": 0.0,
+          "orientation_radians": 0.0,
+          "linear_velocity": 0.0,
+          "angular_momentum": 0.0
+        }
+      },
+      "03_inverse_inertia": {
+        "ms": 57.51859990414232,
+        "cumulative_speedup": 0.5259290060026209,
+        "incremental_speedup": 1.0937896619548488,
+        "bitwise_equal": true,
+        "physical_difference": {
+          "position": 0.0,
+          "orientation_radians": 0.0,
+          "linear_velocity": 0.0,
+          "angular_momentum": 0.0
+        }
+      },
+      "04_ground_culling": {
+        "ms": 35.18830006942153,
+        "cumulative_speedup": 0.8596806328969478,
+        "incremental_speedup": 1.6345944473210208,
+        "bitwise_equal": true,
+        "physical_difference": {
+          "position": 0.0,
+          "orientation_radians": 0.0,
+          "linear_velocity": 0.0,
+          "angular_momentum": 0.0
+        }
+      },
+      "05_support_transform": {
+        "ms": 36.603050073608756,
+        "cumulative_speedup": 0.8264529872077283,
+        "incremental_speedup": 0.9613488493078538,
+        "bitwise_equal": true,
+        "physical_difference": {
+          "position": 0.0,
+          "orientation_radians": 0.0,
+          "linear_velocity": 0.0,
+          "angular_momentum": 0.0
+        }
+      }
+    }
+  },
+  {
+    "case": "impact",
+    "bodies": 125,
+    "stages": {
+      "01_baseline": {
+        "ms": 96.25110006891191,
+        "cumulative_speedup": 1.0,
+        "incremental_speedup": null,
+        "bitwise_equal": true,
+        "physical_difference": {
+          "position": 0.0,
+          "orientation_radians": 0.0,
+          "linear_velocity": 0.0,
+          "angular_momentum": 0.0
+        }
+      },
+      "02_position_prepare": {
+        "ms": 204.51460010372102,
+        "cumulative_speedup": 0.47063192564294914,
+        "incremental_speedup": 0.47063192564294914,
+        "bitwise_equal": true,
+        "physical_difference": {
+          "position": 0.0,
+          "orientation_radians": 0.0,
+          "linear_velocity": 0.0,
+          "angular_momentum": 0.0
+        }
+      },
+      "03_inverse_inertia": {
+        "ms": 148.40449998155236,
+        "cumulative_speedup": 0.6485726516438285,
+        "incremental_speedup": 1.3780889402217824,
+        "bitwise_equal": true,
+        "physical_difference": {
+          "position": 0.0,
+          "orientation_radians": 0.0,
+          "linear_velocity": 0.0,
+          "angular_momentum": 0.0
+        }
+      },
+      "04_ground_culling": {
+        "ms": 143.86210008524358,
+        "cumulative_speedup": 0.6690511261261972,
+        "incremental_speedup": 1.0315746808479596,
+        "bitwise_equal": true,
+        "physical_difference": {
+          "position": 0.0,
+          "orientation_radians": 0.0,
+          "linear_velocity": 0.0,
+          "angular_momentum": 0.0
+        }
+      },
+      "05_support_transform": {
+        "ms": 160.53049988113344,
+        "cumulative_speedup": 0.5995813888337861,
+        "incremental_speedup": 0.8961667732410218,
+        "bitwise_equal": true,
+        "physical_difference": {
+          "position": 0.0,
+          "orientation_radians": 0.0,
+          "linear_velocity": 0.0,
+          "angular_momentum": 0.0
+        }
+      }
+    }
+  },
+  {
+    "case": "stack",
+    "bodies": 125,
+    "stages": {
+      "01_baseline": {
+        "ms": 496.35144998319447,
+        "cumulative_speedup": 1.0,
+        "incremental_speedup": null,
+        "bitwise_equal": true,
+        "physical_difference": {
+          "position": 0.0,
+          "orientation_radians": 0.0,
+          "linear_velocity": 0.0,
+          "angular_momentum": 0.0
+        }
+      },
+      "02_position_prepare": {
+        "ms": 912.2434500604868,
+        "cumulative_speedup": 0.5440997684886459,
+        "incremental_speedup": 0.5440997684886459,
+        "bitwise_equal": true,
+        "physical_difference": {
+          "position": 0.0,
+          "orientation_radians": 0.0,
+          "linear_velocity": 0.0,
+          "angular_momentum": 0.0
+        }
+      },
+      "03_inverse_inertia": {
+        "ms": 647.4290500627831,
+        "cumulative_speedup": 0.7666499517361197,
+        "incremental_speedup": 1.4090245872841571,
+        "bitwise_equal": false,
+        "physical_difference": {
+          "position": 1.3552527156068805e-19,
+          "orientation_radians": 1.9046259522117278e-17,
+          "linear_velocity": 3.135512682828079e-16,
+          "angular_momentum": 7.655483777284366e-18
+        }
+      },
+      "04_ground_culling": {
+        "ms": 653.3371499972418,
+        "cumulative_speedup": 0.7597171689766761,
+        "incremental_speedup": 0.9909570427236785,
+        "bitwise_equal": false,
+        "physical_difference": {
+          "position": 1.3552527156068805e-19,
+          "orientation_radians": 1.9046259522117278e-17,
+          "linear_velocity": 3.135512682828079e-16,
+          "angular_momentum": 7.655483777284366e-18
+        }
+      },
+      "05_support_transform": {
+        "ms": 726.3306500390172,
+        "cumulative_speedup": 0.683368449282061,
+        "incremental_speedup": 0.8995037590140877,
+        "bitwise_equal": false,
+        "physical_difference": {
+          "position": 1.3552527156068805e-19,
+          "orientation_radians": 1.9046259522117278e-17,
+          "linear_velocity": 3.135512682828079e-16,
+          "angular_momentum": 7.655483777284366e-18
+        }
+      }
+    }
+  },
+  {
+    "case": "air",
+    "bodies": 500,
+    "stages": {
+      "01_baseline": {
+        "ms": 123.55035007931292,
+        "cumulative_speedup": 1.0,
+        "incremental_speedup": null,
+        "bitwise_equal": true,
+        "physical_difference": {
+          "position": 0.0,
+          "orientation_radians": 0.0,
+          "linear_velocity": 0.0,
+          "angular_momentum": 0.0
+        }
+      },
+      "02_position_prepare": {
+        "ms": 250.15199987683445,
+        "cumulative_speedup": 0.49390110868649667,
+        "incremental_speedup": 0.49390110868649667,
+        "bitwise_equal": true,
+        "physical_difference": {
+          "position": 0.0,
+          "orientation_radians": 0.0,
+          "linear_velocity": 0.0,
+          "angular_momentum": 0.0
+        }
+      },
+      "03_inverse_inertia": {
+        "ms": 230.0004499265924,
+        "cumulative_speedup": 0.5371743843055333,
+        "incremental_speedup": 1.0876152631730662,
+        "bitwise_equal": true,
+        "physical_difference": {
+          "position": 0.0,
+          "orientation_radians": 0.0,
+          "linear_velocity": 0.0,
+          "angular_momentum": 0.0
+        }
+      },
+      "04_ground_culling": {
+        "ms": 140.01684996765107,
+        "cumulative_speedup": 0.8823962980731069,
+        "incremental_speedup": 1.6426626508147468,
+        "bitwise_equal": true,
+        "physical_difference": {
+          "position": 0.0,
+          "orientation_radians": 0.0,
+          "linear_velocity": 0.0,
+          "angular_momentum": 0.0
+        }
+      },
+      "05_support_transform": {
+        "ms": 148.86999991722405,
+        "cumulative_speedup": 0.8299210730705342,
+        "incremental_speedup": 0.9405310005071835,
+        "bitwise_equal": true,
+        "physical_difference": {
+          "position": 0.0,
+          "orientation_radians": 0.0,
+          "linear_velocity": 0.0,
+          "angular_momentum": 0.0
+        }
+      }
+    }
+  },
+  {
+    "case": "impact",
+    "bodies": 500,
+    "stages": {
+      "01_baseline": {
+        "ms": 399.07469996251166,
+        "cumulative_speedup": 1.0,
+        "incremental_speedup": null,
+        "bitwise_equal": true,
+        "physical_difference": {
+          "position": 0.0,
+          "orientation_radians": 0.0,
+          "linear_velocity": 0.0,
+          "angular_momentum": 0.0
+        }
+      },
+      "02_position_prepare": {
+        "ms": 801.2258000671864,
+        "cumulative_speedup": 0.4980801915378255,
+        "incremental_speedup": 0.4980801915378255,
+        "bitwise_equal": true,
+        "physical_difference": {
+          "position": 0.0,
+          "orientation_radians": 0.0,
+          "linear_velocity": 0.0,
+          "angular_momentum": 0.0
+        }
+      },
+      "03_inverse_inertia": {
+        "ms": 589.8808999918401,
+        "cumulative_speedup": 0.6765343647641958,
+        "incremental_speedup": 1.3582840198390382,
+        "bitwise_equal": true,
+        "physical_difference": {
+          "position": 0.0,
+          "orientation_radians": 0.0,
+          "linear_velocity": 0.0,
+          "angular_momentum": 0.0
+        }
+      },
+      "04_ground_culling": {
+        "ms": 591.841199900955,
+        "cumulative_speedup": 0.6742935436554554,
+        "incremental_speedup": 0.9966877941085499,
+        "bitwise_equal": true,
+        "physical_difference": {
+          "position": 0.0,
+          "orientation_radians": 0.0,
+          "linear_velocity": 0.0,
+          "angular_momentum": 0.0
+        }
+      },
+      "05_support_transform": {
+        "ms": 664.3865001387894,
+        "cumulative_speedup": 0.600666479344697,
+        "incremental_speedup": 0.8908085877381918,
+        "bitwise_equal": true,
+        "physical_difference": {
+          "position": 0.0,
+          "orientation_radians": 0.0,
+          "linear_velocity": 0.0,
+          "angular_momentum": 0.0
+        }
+      }
+    }
+  },
+  {
+    "case": "stack",
+    "bodies": 500,
+    "stages": {
+      "01_baseline": {
+        "ms": 3303.9544500643387,
+        "cumulative_speedup": 1.0,
+        "incremental_speedup": null,
+        "bitwise_equal": true,
+        "physical_difference": {
+          "position": 0.0,
+          "orientation_radians": 0.0,
+          "linear_velocity": 0.0,
+          "angular_momentum": 0.0
+        }
+      },
+      "02_position_prepare": {
+        "ms": 3261.4150000736117,
+        "cumulative_speedup": 1.0130432496293071,
+        "incremental_speedup": 1.0130432496293071,
+        "bitwise_equal": true,
+        "physical_difference": {
+          "position": 0.0,
+          "orientation_radians": 0.0,
+          "linear_velocity": 0.0,
+          "angular_momentum": 0.0
+        }
+      },
+      "03_inverse_inertia": {
+        "ms": 2381.3831000588834,
+        "cumulative_speedup": 1.3874098837699165,
+        "incremental_speedup": 1.36954654628773,
+        "bitwise_equal": false,
+        "physical_difference": {
+          "position": 6.776263578034403e-20,
+          "orientation_radians": 2.3163524911011787e-19,
+          "linear_velocity": 1.3877787807814457e-17,
+          "angular_momentum": 2.0599841277224584e-18
+        }
+      },
+      "04_ground_culling": {
+        "ms": 2492.031899979338,
+        "cumulative_speedup": 1.3258074465626755,
+        "incremental_speedup": 0.9555989632711476,
+        "bitwise_equal": false,
+        "physical_difference": {
+          "position": 6.776263578034403e-20,
+          "orientation_radians": 2.3163524911011787e-19,
+          "linear_velocity": 1.3877787807814457e-17,
+          "angular_momentum": 2.0599841277224584e-18
+        }
+      },
+      "05_support_transform": {
+        "ms": 2580.0414000405,
+        "cumulative_speedup": 1.280581951131666,
+        "incremental_speedup": 0.9658883380476839,
+        "bitwise_equal": false,
+        "physical_difference": {
+          "position": 6.776263578034403e-20,
+          "orientation_radians": 2.3163524911011787e-19,
+          "linear_velocity": 1.3877787807814457e-17,
+          "angular_momentum": 2.0599841277224584e-18
+        }
+      }
+    }
+  },
+  {
+    "case": "curved_demo",
+    "bodies": 5,
+    "stages": {
+      "01_baseline": {
+        "ms": 66.76800001878291,
+        "cumulative_speedup": 1.0,
+        "incremental_speedup": null,
+        "bitwise_equal": true,
+        "physical_difference": {
+          "position": 0.0,
+          "orientation_radians": 0.0,
+          "linear_velocity": 0.0,
+          "angular_momentum": 0.0
+        }
+      },
+      "02_position_prepare": {
+        "ms": 68.75724997371435,
+        "cumulative_speedup": 0.9710685061474692,
+        "incremental_speedup": 0.9710685061474692,
+        "bitwise_equal": true,
+        "physical_difference": {
+          "position": 0.0,
+          "orientation_radians": 0.0,
+          "linear_velocity": 0.0,
+          "angular_momentum": 0.0
+        }
+      },
+      "03_inverse_inertia": {
+        "ms": 63.01655003335327,
+        "cumulative_speedup": 1.0595311863858634,
+        "incremental_speedup": 1.0910982898512003,
+        "bitwise_equal": false,
+        "physical_difference": {
+          "position": 0.0,
+          "orientation_radians": 2.0816681711721685e-17,
+          "linear_velocity": 3.725318664660193e-16,
+          "angular_momentum": 2.0816681711721685e-17
+        }
+      },
+      "04_ground_culling": {
+        "ms": 67.22305004950613,
+        "cumulative_speedup": 0.9932307440619238,
+        "incremental_speedup": 0.9374247373028299,
+        "bitwise_equal": false,
+        "physical_difference": {
+          "position": 0.0,
+          "orientation_radians": 2.0816681711721685e-17,
+          "linear_velocity": 3.725318664660193e-16,
+          "angular_momentum": 2.0816681711721685e-17
+        }
+      },
+      "05_support_transform": {
+        "ms": 61.19064998347312,
+        "cumulative_speedup": 1.0911470957869571,
+        "incremental_speedup": 1.0985836899536496,
+        "bitwise_equal": false,
+        "physical_difference": {
+          "position": 0.0,
+          "orientation_radians": 2.0816681711721685e-17,
+          "linear_velocity": 3.725318664660193e-16,
+          "angular_momentum": 2.0816681711721685e-17
+        }
+      }
+    }
+  }
+]

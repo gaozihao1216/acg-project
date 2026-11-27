@@ -1,0 +1,84 @@
+         799368 function calls in 0.706 seconds
+
+   Ordered by: cumulative time
+   List reduced from 264 to 35 due to restriction <35>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+        6    0.000    0.000    0.709    0.118 D:\清华课程\大一上\高等计算机图形学\project\Code\src\physics\world.py:433(step)
+       18    0.000    0.000    0.709    0.039 D:\清华课程\大一上\高等计算机图形学\project\Code\src\physics\world.py:303(substep)
+       36    0.000    0.000    0.495    0.014 D:\清华课程\大一上\高等计算机图形学\project\Code\src\physics\world.py:251(_current_contacts)
+       36    0.001    0.000    0.489    0.014 D:\清华课程\大一上\高等计算机图形学\project\Code\src\physics\narrowphase.py:893(detect_contacts)
+      180    0.001    0.000    0.483    0.003 D:\清华课程\大一上\高等计算机图形学\project\Code\src\physics\narrowphase.py:858(_collide_pair)
+      180    0.001    0.000    0.481    0.003 D:\清华课程\大一上\高等计算机图形学\project\Code\src\physics\narrowphase.py:782(_collide_points)
+      180    0.001    0.000    0.480    0.003 D:\清华课程\大一上\高等计算机图形学\project\Code\src\physics\narrowphase.py:556(collide_gjk)
+      180    0.002    0.000    0.479    0.003 D:\清华课程\大一上\高等计算机图形学\project\Code\src\physics\gjk.py:688(collide)
+       18    0.001    0.000    0.463    0.026 D:\清华课程\大一上\高等计算机图形学\project\Code\src\physics\world.py:346(_solve_with_toi)
+       18    0.000    0.000    0.315    0.017 D:\清华课程\大一上\高等计算机图形学\project\Code\src\physics\world.py:260(_solve_current_contacts)
+      162    0.016    0.000    0.260    0.002 D:\清华课程\大一上\高等计算机图形学\project\Code\src\physics\gjk.py:510(penetration)
+    11047    0.019    0.000    0.227    0.000 D:\清华课程\大一上\高等计算机图形学\project\Code\src\physics\gjk.py:70(_minkowski)
+    22184    0.043    0.000    0.210    0.000 D:\清华课程\大一上\高等计算机图形学\project\Code\src\physics\support.py:156(support_world)
+      252    0.016    0.000    0.173    0.001 D:\清华课程\大一上\高等计算机图形学\project\Code\src\physics\gjk.py:326(distance)
+      108    0.002    0.000    0.172    0.002 D:\清华课程\大一上\高等计算机图形学\project\Code\src\physics\gjk.py:704(_build_manifold)
+      162    0.009    0.000    0.144    0.001 D:\清华课程\大一上\高等计算机图形学\project\Code\src\physics\gjk.py:613(_refine_normal)
+       18    0.001    0.000    0.135    0.008 D:\清华课程\大一上\高等计算机图形学\project\Code\src\physics\toi.py:784(earliest_toi_event)
+       72    0.001    0.000    0.132    0.002 D:\清华课程\大一上\高等计算机图形学\project\Code\src\physics\toi.py:696(_dispatch_toi)
+       72    0.001    0.000    0.131    0.002 D:\清华课程\大一上\高等计算机图形学\project\Code\src\physics\toi.py:466(curved_pair_toi)
+    47132    0.066    0.000    0.123    0.000 D:\清华课程\大一上\高等计算机图形学\project\Code\src\mathutils\quaternion.py:157(quat_rotate_vector)
+     2633    0.012    0.000    0.093    0.000 D:\清华课程\大一上\高等计算机图形学\project\Code\src\physics\gjk.py:253(closest_point_on_simplex)
+      108    0.001    0.000    0.082    0.001 D:\清华课程\大一上\高等计算机图形学\project\Code\src\physics\patch.py:124(overlap)
+      108    0.001    0.000    0.074    0.001 D:\清华课程\大一上\高等计算机图形学\project\Code\src\mathutils\poly2d.py:232(convex_intersection)
+     3368    0.003    0.000    0.071    0.000 D:\清华课程\大一上\高等计算机图形学\project\Code\src\physics\gjk.py:603(_extent)
+     1373    0.015    0.000    0.071    0.000 D:\清华课程\大一上\高等计算机图形学\project\Code\src\physics\gjk.py:185(_tetrahedron_closest)
+       36    0.002    0.000    0.065    0.002 D:\清华课程\大一上\高等计算机图形学\project\Code\src\mathutils\poly2d.py:426(_clip_polygon)
+       18    0.002    0.000    0.065    0.004 D:\清华课程\大一上\高等计算机图形学\project\Code\src\physics\solver.py:486(solve)
+      162    0.013    0.000    0.062    0.000 D:\清华课程\大一上\高等计算机图形学\project\Code\src\physics\gjk.py:428(_initial_tetrahedron)
+     1692    0.026    0.000    0.060    0.000 D:\清华课程\大一上\高等计算机图形学\project\Code\src\mathutils\poly2d.py:443(_clip_edge)
+    47348    0.050    0.000    0.057    0.000 D:\清华课程\大一上\高等计算机图形学\project\Code\src\mathutils\quaternion.py:44(quat_normalize)
+      108    0.002    0.000    0.046    0.000 D:\清华课程\大一上\高等计算机图形学\project\Code\src\physics\patch.py:226(contact_anchors)
+    22184    0.011    0.000    0.041    0.000 D:\清华课程\大一上\高等计算机图形学\project\Code\src\physics\support.py:133(support_local)
+     4916    0.025    0.000    0.039    0.000 D:\清华课程\大一上\高等计算机图形学\project\Code\src\physics\gjk.py:142(_triangle_closest)
+     1692    0.012    0.000    0.029    0.000 D:\清华课程\大一上\高等计算机图形学\project\Code\src\mathutils\poly2d.py:459(<listcomp>)
+     1440    0.007    0.000    0.024    0.000 D:\清华课程\大一上\高等计算机图形学\project\Code\src\physics\solver.py:296(_solve_friction)
+
+
+         799368 function calls in 0.706 seconds
+
+   Ordered by: internal time
+   List reduced from 264 to 35 due to restriction <35>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+    47132    0.066    0.000    0.123    0.000 D:\清华课程\大一上\高等计算机图形学\project\Code\src\mathutils\quaternion.py:157(quat_rotate_vector)
+    47348    0.050    0.000    0.057    0.000 D:\清华课程\大一上\高等计算机图形学\project\Code\src\mathutils\quaternion.py:44(quat_normalize)
+    22184    0.043    0.000    0.210    0.000 D:\清华课程\大一上\高等计算机图形学\project\Code\src\physics\support.py:156(support_world)
+     1692    0.026    0.000    0.060    0.000 D:\清华课程\大一上\高等计算机图形学\project\Code\src\mathutils\poly2d.py:443(_clip_edge)
+     4916    0.025    0.000    0.039    0.000 D:\清华课程\大一上\高等计算机图形学\project\Code\src\physics\gjk.py:142(_triangle_closest)
+    11047    0.019    0.000    0.227    0.000 D:\清华课程\大一上\高等计算机图形学\project\Code\src\physics\gjk.py:70(_minkowski)
+    44992    0.018    0.000    0.018    0.000 D:\清华课程\大一上\高等计算机图形学\project\Code\src\mathutils\poly2d.py:102(cross2)
+     1373    0.018    0.000    0.021    0.000 D:\清华课程\大一上\高等计算机图形学\project\Code\src\physics\gjk.py:81(_solve_linear)
+      252    0.016    0.000    0.173    0.001 D:\清华课程\大一上\高等计算机图形学\project\Code\src\physics\gjk.py:326(distance)
+      162    0.016    0.000    0.260    0.002 D:\清华课程\大一上\高等计算机图形学\project\Code\src\physics\gjk.py:510(penetration)
+     1373    0.015    0.000    0.071    0.000 D:\清华课程\大一上\高等计算机图形学\project\Code\src\physics\gjk.py:185(_tetrahedron_closest)
+      162    0.013    0.000    0.062    0.000 D:\清华课程\大一上\高等计算机图形学\project\Code\src\physics\gjk.py:428(_initial_tetrahedron)
+     2633    0.012    0.000    0.093    0.000 D:\清华课程\大一上\高等计算机图形学\project\Code\src\physics\gjk.py:253(closest_point_on_simplex)
+     1692    0.012    0.000    0.029    0.000 D:\清华课程\大一上\高等计算机图形学\project\Code\src\mathutils\poly2d.py:459(<listcomp>)
+    22940    0.011    0.000    0.011    0.000 D:\清华课程\大一上\高等计算机图形学\project\Code\src\mathutils\quaternion.py:89(quat_conjugate)
+    22184    0.011    0.000    0.041    0.000 D:\清华课程\大一上\高等计算机图形学\project\Code\src\physics\support.py:133(support_local)
+     7554    0.011    0.000    0.011    0.000 D:\清华课程\大一上\高等计算机图形学\project\Code\src\physics\gjk.py:121(_segment_closest)
+    68366    0.011    0.000    0.011    0.000 {built-in method math.sqrt}
+     8473    0.011    0.000    0.016    0.000 D:\清华课程\大一上\高等计算机图形学\project\Code\src\geom\geometry.py:357(support)
+    26518    0.010    0.000    0.010    0.000 D:\清华课程\大一上\高等计算机图形学\project\Code\src\mathutils\vec3.py:55(dot)
+      162    0.009    0.000    0.144    0.001 D:\清华课程\大一上\高等计算机图形学\project\Code\src\physics\gjk.py:613(_refine_normal)
+    80165    0.009    0.000    0.009    0.000 {method 'append' of 'list' objects}
+     2440    0.009    0.000    0.018    0.000 D:\清华课程\大一上\高等计算机图形学\project\Code\src\physics\gjk.py:406(_make_face)
+     9625    0.008    0.000    0.008    0.000 D:\清华课程\大一上\高等计算机图形学\project\Code\src\geom\geometry.py:192(support)
+    24576    0.008    0.000    0.008    0.000 D:\清华课程\大一上\高等计算机图形学\project\Code\src\mathutils\vec3.py:32(sub)
+    12071    0.008    0.000    0.008    0.000 D:\清华课程\大一上\高等计算机图形学\project\Code\src\mathutils\vec3.py:60(cross)
+    70686    0.007    0.000    0.007    0.000 {built-in method builtins.abs}
+     1440    0.007    0.000    0.024    0.000 D:\清华课程\大一上\高等计算机图形学\project\Code\src\physics\solver.py:296(_solve_friction)
+     3834    0.006    0.000    0.009    0.000 D:\清华课程\大一上\高等计算机图形学\project\Code\src\physics\body.py:220(inverse_inertia_world)
+     4883    0.006    0.000    0.009    0.000 {built-in method builtins.sum}
+      144    0.006    0.000    0.009    0.000 D:\清华课程\大一上\高等计算机图形学\project\Code\src\mathutils\poly2d.py:298(_convex_orientation)
+     5330    0.005    0.000    0.009    0.000 D:\清华课程\大一上\高等计算机图形学\project\Code\src\physics\body.py:272(apply_impulse)
+      144    0.005    0.000    0.005    0.000 D:\清华课程\大一上\高等计算机图形学\project\Code\src\physics\patch.py:195(_ray_to_boundary)
+     6240    0.005    0.000    0.006    0.000 D:\清华课程\大一上\高等计算机图形学\project\Code\src\mathutils\vec3.py:73(length)
+    12888    0.004    0.000    0.006    0.000 D:\清华课程\大一上\高等计算机图形学\project\Code\src\physics\patch.py:601(_same_point)

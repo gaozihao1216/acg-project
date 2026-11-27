@@ -30,6 +30,8 @@ TEST_MODULES = [
     "test_multicontact",
     "test_toi_split",
     "test_toi_convex",
+    "test_collision_reliability",
+    "test_dynamics_contact",
     "test_box_collision",
     "test_box_box",
     "test_broadphase",

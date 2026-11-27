@@ -193,8 +193,12 @@ class BruteForceBroadphase:
         """用于日志与对照表的短名称。"""
         return "brute"
 
-    def candidate_pairs(self, bodies: list[RigidBody]) -> list[tuple[int, int]]:
-        """返回所有可能的物体对（含静态-静态，由调用方过滤）。"""
+    def candidate_pairs(
+        self,
+        bodies: list[RigidBody],
+        inflation: list[float] | None = None,
+    ) -> list[tuple[int, int]]:
+        """返回所有对；接受与哈希相同的扫掠参数，但全枚举无需使用膨胀量。"""
         count = len(bodies)
         return [(i, j) for i in range(count) for j in range(i + 1, count)]
 

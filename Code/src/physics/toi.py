@@ -31,6 +31,7 @@ A 先撞 B，B 被推动后再撞 C。如果只在一个时刻做一次检测、
 from __future__ import annotations
 
 import math
+from typing import NamedTuple
 
 from ..mathutils import vec3
 from ..geom.geometry import (
@@ -51,17 +52,16 @@ from .convex_sat import (
     separation_with_side,
     _separation,
 )
-from .narrowphase import GroundPlane
+from .narrowphase import (
+    GroundPlane, collide_sphere_box, collide_sphere_hull, collide_sphere_sphere,
+)
 from .support import support_world
 
 #: 判定"相对速度可忽略"的阈值（m/s）。低于此值不认为会再次碰撞。
 _MIN_CLOSING_SPEED_SQUARED = 1e-20
 
-#: TOI 小于该值（秒）时认为"此刻已经接触"，不再作为未来的事件。
-_MIN_TOI = 1e-12
-
-#: 间隙小于该值（米）就算已经接触。凸包顶点是双精度，1 µm 远小于任何建模精度。
-_TOUCH_EPS = 1e-6
+# 相切且闭合的状态允许返回 0；world 会略微越过接触以生成窄相约束。
+# 不能用时间/正间隙阈值丢弃事件：窄相要求真实穿透，这会留下无人处理的空档。
 
 #: 闭合速度下界（m/s）。低于它认为窗口内不会接触，直接判为"无事件"。
 _MIN_CLOSING = 1e-9
@@ -91,16 +91,12 @@ def sphere_sphere_toi(
     参数
     ----
     body_a, body_b : 两个球刚体（静态物体的速度视为 0）
-    max_time       : 只关心 ``(0, max_time]`` 区间内的事件
+    max_time       : 只关心 ``[0, max_time]`` 区间内的事件（0 表示相切且闭合）
 
     返回
     ----
-    float | None : 接触时刻（秒）；不会碰撞、或已在接触、或超出区间时返回 None
+    float | None : 接触时刻（秒）；不会碰撞、真实穿透或超出区间时返回 None
     """
-    # 目前只有球-球有解析 TOI（本质是一元二次方程）。
-    # 盒子需要考虑朝向与角速度，属于另一类问题（保守推进 / GJK 射线），
-    # 在实现之前直接跳过——跳过只意味着"不做子步切分"，
-    # 碰撞仍会在子步边界的常规检测中被处理，不会漏碰撞。
     if not isinstance(body_a.geometry, SphereGeometry) or not isinstance(
         body_b.geometry, SphereGeometry
     ):
@@ -126,9 +122,15 @@ def sphere_sphere_toi(
     b = 2.0 * (dx * wx + dy * wy + dz * wz)
     c = dx * dx + dy * dy + dz * dz - radius_sum * radius_sum
 
-    if c <= 0.0:
-        # 已经重叠：属于持续接触，交给正常求解流程，不作为未来的事件
-        return None
+    if c < 0.0:
+        # 平方距离与窄相的 sqrt 距离在相切处可能有一位舍入差异。
+        # 持续接触必须真的存在，不能仅凭负的平方间隙跳过闭合事件。
+        if collide_sphere_sphere(body_a, body_b) is not None:
+            return None
+        c = 0.0
+
+    if b >= 0.0:
+        return None  # 分离或擦过，相切本身不是闭合事件。
 
     discriminant = b * b - 4.0 * a * c
     if discriminant < 0.0:
@@ -137,10 +139,10 @@ def sphere_sphere_toi(
 
     sqrt_disc = math.sqrt(discriminant)
     # 较小根 = 首次接触时刻；较大根 = 若穿透后继续运动则会分离的时刻
-    t = (-b - sqrt_disc) / (2.0 * a)
+    # 等价的小根写法，避免近接触时两个相近浮点数相减丢失精度。
+    t = 2.0 * c / (-b + sqrt_disc)
 
-    if t <= _MIN_TOI or t > max_time:
-        # t <= 0 说明正在分离（c > 0 且 t < 0 意味着永远不会接近）
+    if t < 0.0 or t > max_time:
         return None
     return t
 
@@ -158,21 +160,19 @@ def sphere_ground_toi(
     ----
     body     : 球刚体
     ground   : 地面
-    max_time : 只关心 ``(0, max_time]`` 区间内的事件
+    max_time : 只关心 ``[0, max_time]`` 区间内的事件
 
     返回
     ----
     float | None : 接触时刻（秒）；不适用时返回 None
     """
-    # 只有球能用"球心高度减半径"求接触时刻；盒子的最低点是旋转后的顶点，
-    # 需要另一套推导，实现前先跳过（影响仅是失去子步切分，不会漏碰撞）。
     if not isinstance(body.geometry, SphereGeometry):
         return None
 
     gap = body.position[2] - ground.z - body.geometry.radius
 
-    if gap <= 0.0:
-        # 已经接触或已穿透，不作为未来事件
+    if gap < 0.0:
+        # 真实穿透由持续接触求解；间隙为 0 且下降时仍需激活约束。
         return None
 
     vz = body.linear_velocity[2]
@@ -181,7 +181,7 @@ def sphere_ground_toi(
         return None
 
     t = gap / (-vz)
-    if t <= _MIN_TOI or t > max_time:
+    if t < 0.0 or t > max_time:
         return None
     return t
 
@@ -200,11 +200,11 @@ def _overlapping(polytope_a: Polytope, polytope_b: Polytope) -> bool:
     实测后果：8 层棱柱堆叠的事件数暴涨、耗时 +160%，峰值穿透反而从 30 mm
     升到 36 mm（多余的求解在往塔里注入位移）。
 
-    判据很直接：SAT 只要存在**一条**分离轴就是分离；一条都没有，就是已经嵌入。
+    判据：只要存在一条间隙非负的轴，就没有严格嵌入；相切仍需检查闭合速度。
     去重后轴只有个位数，这个检查很便宜。
     """
     for axis, _kind, _index_a, _index_b in candidate_axes(polytope_a, polytope_b, with_indices=False):
-        if _separation(polytope_a, polytope_b, axis) > 0.0:
+        if _separation(polytope_a, polytope_b, axis) >= 0.0:
             return False
     return True
 
@@ -249,6 +249,7 @@ def _spin_tip_speed(body: RigidBody) -> float:
     """
     omega = body.angular_velocity
     spin = math.sqrt(omega[0] ** 2 + omega[1] ** 2 + omega[2] ** 2)
+    spin = getattr(body, "angular_speed_bound", spin)
     if spin <= 0.0:
         return 0.0
     return spin * body.geometry.bounding_radius()
@@ -260,7 +261,7 @@ def hull_hull_toi(
     max_time: float,
     cache: dict | None = None,
 ) -> float | None:
-    """预测两个**盒子/凸包**的接触时刻（保守，永不偏晚）。
+    """预测两个**盒子/凸包**的接触时刻（分离轴推进，含接触余量）。
 
     算法：沿 SAT 候选轴逐条求"间隙何时收完"
     ---------------------------------------
@@ -275,9 +276,9 @@ def hull_hull_toi(
     第一项是平移沿该轴的投影（侧符号说明是哪一侧的投影给出的间隙），
     后两项是自转——凸包上任意点因自转获得的速度不超过 ``|ω|R``。
 
-    于是 ``t_n = g_n / 闭合速率`` 是"这条轴收完"的时刻。取所有轴的**最小**值
-    就是 TOI 的**保守**估计：真实接触一定不早于任何一个单轴收完的时刻，
-    所以 ``min_n t_n ≤ 真实 TOI``。
+    ``t_n = g_n / 闭合速率`` 是这条分离轴消失的时间下界。接触要求所有轴都
+    不再分离，所以取所有下界的最大值。纯平移时这就是区间进入时间；有自转时
+    仍是安全推进下界，之后重新查询。取最小值会反复切向尚未闭合的另一条轴。
 
     为什么"保守"在这里是安全的
     -------------------------
@@ -285,7 +286,10 @@ def hull_hull_toi(
     代价是一两次多余的窄相查询。偏晚则会漏掉切分、让接触在同一时刻联立求解，
     那才是要避免的（牛顿摆会飞出两个球）。所以宁可偏早。
 
-    对纯平移的情形（不旋转），沿正确轴的估计是**精确**的：面-面接近由面法向
+    实际返回值还加了 ``_CONTACT_OVERLAP``，不能把这个含余量的推进时刻等同于
+    无余量的严格下界；世界层仍须重查窄相并限制探测工作量。
+
+    对纯平移的情形（不旋转），不计余量时沿正确轴的估计是**精确**的：面-面接近由面法向
     给出精确解，棱-棱接近由叉积轴给出精确解。
 
     返回值
@@ -331,8 +335,8 @@ def hull_hull_toi(
     for axis, _kind, _index_a, _index_b in candidate_axes(polytope_a, polytope_b, with_indices=False):
         gap, side = separation_with_side(polytope_a, polytope_b, axis)
 
-        if gap <= _TOUCH_EPS:
-            # 这条轴已经收完（或重叠）：不是未来事件，交给常规求解流程
+        if gap < 0.0:
+            # 仅跳过已重叠的轴，正间隙和相切轴仍可能需要激活接触。
             continue
 
         closing = max(
@@ -342,13 +346,13 @@ def hull_hull_toi(
         ) + spin_bound
 
         if closing <= _MIN_CLOSING:
-            continue   # 沿这条轴没有接近趋势
+            return None  # 存在整个窗口内都不能闭合的分离轴。
 
         # 多推进 _CONTACT_OVERLAP，让裁剪多边形有面积（见常量说明）
         t = (gap + _CONTACT_OVERLAP) / closing
-        if t <= _MIN_TOI or t > max_time:
-            continue
-        if best is None or t < best:
+        if t > max_time:
+            return None
+        if best is None or t > best:
             best = t
 
     return best
@@ -360,34 +364,17 @@ def hull_ground_toi(
     max_time: float,
     cache: dict | None = None,
 ) -> float | None:
-    """预测盒子/凸包与水平地面的接触时刻（纯平移时顶点模型精确，有自转时是一阶近似）。
+    """盒/凸包落地推进：纯平移使用顶点解，自转使用支撑高度与角动量速度上界。
 
-    返回值与"首次接触时刻"要分开看：分子里的 ``_CONTACT_OVERLAP``（200 µm）是
-    故意留的穿透余量，纯平移时返回时刻因此比首次接触早 ``200 µm / |v_z|``。那不是
-    误差，是为了让切分点处已经有穿透、裁剪多边形不退化。
-
-    为什么地面这里比"物体对"简单
-    ----------------------------
-    地面是一个平面，物体上的点撞地时**一定在顶点上**（凸多面体的极值必在顶点），
-    所以只要枚举顶点，不需要在棱-棱之间做轴收缩。**没有自转**时顶点轨迹确实是直线：
-
-        ``z_i(t) = z_i + v_z · t``
-
-    于是每个顶点给出精确的撞击时刻 ``t_i = (z_i - g) / (-v_{i,z})``，TOI 取最小。
-
-    **有自转时不是直线。** ``r_i`` 随 ``R(t)`` 转动，``z_i(t) = c_z(t) + (R(t) r_i)_z``
-    是条圆弧；这里把首帧瞬时速度 ``v_z + (ω × r_i)_z`` 当常数做直线外推。因此：
-
-    * 这是**一阶近似**，不是精确解；
-    * 也**没有**严格的保守性证明，不能排除某些姿态/角速度/时间窗下偏晚。
-
-    实测（把窗口取成一个子步）：1500 组细长杆里有真实接触的 40 组中 16 组偏晚，
-    最多 0.206 ms；300 个方盒（ω ≤ 30）只 1 组偏晚 0.51 ms，但偏早最多 365 ms。
-    结论按"当前的样本分布"讲，不要升格成"算法保证不偏晚"。
-
-    球-地面的一元一次方程是这条的自然推广：球可看成无穷多顶点，最低那个等价于
-    球心高度减半径。
-    """
+纯平移返回值是首次接触加 200 微米接触余量；不是无余量的精确 TOI。
+有自转时改用 curved_ground_toi：自由转动的 omega 会随姿态变化，不能继续
+把首帧顶点瞬时速度当常数。速度上界来自 |L|/min(I)，之后仍须重查窄相。
+实际推进包含接触余量和有限工作预算，不把它宣称为任意旋转的精确 CCD。
+"""
+    # 自由转动时 omega 会随姿态变化，首帧顶点速度外推不再与动力学一致。
+    # 支撑高度 + |L| / min(I) 给出整个姿态推进期间可用的速度上界。
+    if body.angular_velocity != (0.0, 0.0, 0.0):
+        return curved_ground_toi(body, ground, max_time, cache)
     polytope = _cached_polytope(body, cache)
     if polytope is None:
         return None
@@ -396,15 +383,13 @@ def hull_ground_toi(
     wx, wy, wz = body.angular_velocity
     cx, cy, cz = body.position
 
-    # 只要有顶点已经贴地，这个物体就处在**持续接触**里，不产生未来事件。
+    # 有顶点真实穿入地面时，物体已处在持续接触里，不产生未来事件。
+    # 恰好相切或仍有微小正间隙则不能跳过：窄相此时还没有穿透约束。
     #
-    # 这里必须整体返回 None，而不是"跳过这个顶点、继续算别的顶点"。
-    # 后者会给出"另一侧顶点何时落地"的时刻——听起来合理，实则有害：
-    # 贴地的物体由求解器接管，再报一个 0.3 s 后的事件会让子步在毫无接触的
-    # 时刻被切开一次，白白扰动求解流程（实测：一个底面恰好贴地的盒子，
-    # 报出 t=0.3001 s，而它其实一直躺着）。
+    # 已有真实穿透时整体返回 None，不另报另一侧顶点的事件。
+    # 恰好相切的静止物体则由下方的闭合速度判据排除。
     for vertex in polytope.vertices:
-        if vertex[2] - ground.z <= _TOUCH_EPS:
+        if vertex[2] - ground.z < 0.0:
             return None
 
     best: float | None = None
@@ -424,7 +409,7 @@ def hull_ground_toi(
 
         # 与 hull_hull_toi 同样的理由：留 200 µm 让接触流形撑得开
         t = (gap + _CONTACT_OVERLAP) / (-vertex_vz)
-        if t <= _MIN_TOI or t > max_time:
+        if t < 0.0 or t > max_time:
             continue
         if best is None or t < best:
             best = t
@@ -452,8 +437,13 @@ def sphere_hull_toi(
     )
     # distance 为负表示球心在多面体内部
     gap = distance - sphere_body.geometry.radius
-    if gap <= _TOUCH_EPS:
-        return None
+    if gap < 0.0:
+        # 世界多面体查询与窄相的局部查询可能在相切处有舍入差异。
+        # 只有窄相确实生成了持续接触，才可以把这个事件交给它处理。
+        collide = collide_sphere_box if isinstance(polytope_body.geometry, BoxGeometry) else collide_sphere_hull
+        if collide(sphere_body, polytope_body) is not None:
+            return None
+        gap = 0.0
 
     relative_x = sphere_body.linear_velocity[0] - polytope_body.linear_velocity[0]
     relative_y = sphere_body.linear_velocity[1] - polytope_body.linear_velocity[1]
@@ -468,7 +458,7 @@ def sphere_hull_toi(
         return None
 
     t = gap / closing
-    if t <= _MIN_TOI or t > max_time:
+    if t < 0.0 or t > max_time:
         return None
     return t
 
@@ -501,35 +491,39 @@ def curved_pair_toi(
     ``curved_pair_toi(a, b)`` 与 ``curved_pair_toi(b, a)`` 逐位相等——
     能力表测试会检查这一点。
     """
-    gap, point_a, point_b, _simplex = _gjk.distance(body_a, body_b)
-    if gap <= _TOUCH_EPS:
-        return None
-
+    gap, point_a, point_b, simplex = _gjk.distance(body_a, body_b)
     delta = vec3.sub(point_b, point_a)
     length = vec3.length(delta)
-    if length <= _MIN_CLOSING:
-        return None
-    normal = (delta[0] / length, delta[1] / length, delta[2] / length)
+    normal = None
+    if gap == 0.0:
+        # GJK 的零距离还包括其容差内的正间隙。只有真实穿透才能交给持续接触。
+        penetration = _gjk.penetration(body_a, body_b, simplex)
+        if penetration is not None:
+            normal, depth = penetration
+            if depth > 0.0:
+                return None
+        gap = length
+    if length > 1e-12:
+        normal = vec3.scale(delta, 1.0 / length)
 
     relative_x = body_b.linear_velocity[0] - body_a.linear_velocity[0]
     relative_y = body_b.linear_velocity[1] - body_a.linear_velocity[1]
     relative_z = body_b.linear_velocity[2] - body_a.linear_velocity[2]
 
     # 法向是 A→B，所以"接近"是相对速度在 -n 上的投影
-    closing = max(
-        0.0,
-        -(
-            relative_x * normal[0]
-            + relative_y * normal[1]
-            + relative_z * normal[2]
-        ),
-    ) + _spin_tip_speed(body_a) + _spin_tip_speed(body_b)
+    if normal is None:
+        # 退化相切、见证点重合且 EPA 无法建四面体时，不能直接宣布无事件。
+        # 用相对速度模长作保守探测上界，随后重新查询；事件预算仍限制工作量。
+        approach = math.sqrt(relative_x**2 + relative_y**2 + relative_z**2)
+    else:
+        approach = -(relative_x * normal[0] + relative_y * normal[1] + relative_z * normal[2])
+    closing = max(0.0, approach) + _spin_tip_speed(body_a) + _spin_tip_speed(body_b)
     if closing <= _MIN_CLOSING:
         return None
 
     # 多推进一点穿透，让窄相能报出"真实穿透"（见 _CONTACT_OVERLAP 的说明）
     t = (gap + _CONTACT_OVERLAP) / closing
-    if t <= _MIN_TOI or t > max_time:
+    if t < 0.0 or t > max_time:
         return None
     return t
 
@@ -551,7 +545,7 @@ def curved_ground_toi(
     """
     lowest = support_world(body, (0.0, 0.0, -1.0))
     gap = lowest[2] - ground.z
-    if gap <= _TOUCH_EPS:
+    if gap < 0.0:
         return None
 
     closing = max(0.0, -body.linear_velocity[2]) + _spin_tip_speed(body)
@@ -559,7 +553,7 @@ def curved_ground_toi(
         return None
 
     t = (gap + _CONTACT_OVERLAP) / closing
-    if t <= _MIN_TOI or t > max_time:
+    if t < 0.0 or t > max_time:
         return None
     return t
 
@@ -658,7 +652,8 @@ def body_toi(
     """两个刚体之间的接触时刻（按几何类型分派）。
 
     球-球走精确的一元二次方程；含球的其他组合走"最近点 + 法向"；其余走
-    ``hull_hull_toi`` 的保守轴推进。三种路径的共同要求是**不偏晚**。
+    ``hull_hull_toi`` 的分离轴推进。部分路径包含接触余量，不能据此声称全流程
+    严格不漏碰撞；旋转地面查询等近似边界仍须单独验证。
 
     进入分派前先做一次包围球拒绝（:func:`may_collide`）——它不改结果，只把
     绝大多数"隔着半个场景"的物体对挡在外面。
@@ -768,6 +763,15 @@ def ground_toi(
     cache: dict | None = None,
 ) -> float | None:
     """刚体与地面的接触时刻（查表；未登记的几何走保守支撑点解）。"""
+    if isinstance(body, RigidBody):
+        # A COM-centred bounding sphere encloses every orientation, so no angular
+        # approximation is needed for this rejection. Re-query after impulses as
+        # usual. PartView centres follow arcs rather than straight COM motion;
+        # they deliberately retain the detailed path.
+        lowest_bound = body.position[2] - body.bounding_radius
+        fall = max(0.0, -body.linear_velocity[2]) * max_time
+        if lowest_bound > ground.z + fall:
+            return None
     if isinstance(body.geometry, CompoundGeometry):
         return compound_ground_toi(body, ground, max_time, cache)
 
@@ -777,12 +781,21 @@ def ground_toi(
     return handler(body, ground, max_time, cache)
 
 
-def earliest_toi(
+class TOIEvent(NamedTuple):
+    """一次预测推进及其物体对；是否真的接触要由推进后的窄相确认。"""
+
+    time: float
+    label: str
+    body_a: int
+    body_b: int
+
+
+def earliest_toi_event(
     bodies: list[RigidBody],
     ground: GroundPlane | None,
     max_time: float,
     pairs: list[tuple[int, int]] | None = None,
-) -> tuple[float, str] | None:
+) -> TOIEvent | None:
     """找出整个场景中最早发生的接触事件。
 
     参数
@@ -796,17 +809,17 @@ def earliest_toi(
 
     返回
     ----
-    (时刻, 描述) 二元组；没有任何事件时返回 None。
-    描述字符串仅用于日志与调试（例如 ``'ball_a' <-> 'ball_b'``）。
+    TOIEvent；除时间/描述外保留物体对索引，供推进后确认实际接触。
+    没有任何事件时返回 None。
 
     为什么内层要摊平
     ----------------
-    这是全流程里唯一还在 O(N²) 上跑循环的地方。循环体里每多一次属性访问或方法
-    调用，就乘以 N²/2 次——56 个物体时是 1 534 次/子步，500 个物体时是 124 750 次。
-    所以位置、速度、半径、静态标记在循环**之前**取成元组，内层只做算术。
+    未给候选对的兼容路径全枚举 O(N²)；正常世界流程只遍历扫掠宽阶段给出的候选。
+    两种路径都把位置、速度、半径、静态标记预先摊平，避免内层重复属性访问。
     """
     best_time: float | None = None
     best_label = ""
+    best_pair = (-1, -1)
 
     count = len(bodies)
     # 同一次调用内复用世界坐标多面体：每对物体都要用，重建 N-1 次是浪费
@@ -824,13 +837,14 @@ def earliest_toi(
     ]
 
     if ground is not None:
-        for body in bodies:
+        for index, body in enumerate(bodies):
             if body.is_static:
                 continue
             t = ground_toi(body, ground, max_time, cache)
             if t is not None and (best_time is None or t < best_time):
                 best_time = t
                 best_label = f"地面 <-> '{body.name}'"
+                best_pair = (-1, index)
 
     if pairs is None:
         candidate_iter = (
@@ -864,7 +878,19 @@ def earliest_toi(
         if t is not None and (best_time is None or t < best_time):
             best_time = t
             best_label = f"'{bodies[i].name}' <-> '{bodies[j].name}'"
+            best_pair = (i, j)
 
     if best_time is None:
         return None
-    return best_time, best_label
+    return TOIEvent(best_time, best_label, *best_pair)
+
+
+def earliest_toi(
+    bodies: list[RigidBody],
+    ground: GroundPlane | None,
+    max_time: float,
+    pairs: list[tuple[int, int]] | None = None,
+) -> tuple[float, str] | None:
+    """兼容原来的二元组查询接口；世界推进使用带物体对身份的结构化结果。"""
+    event = earliest_toi_event(bodies, ground, max_time, pairs)
+    return None if event is None else (event.time, event.label)

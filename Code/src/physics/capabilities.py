@@ -259,8 +259,8 @@ TOI_IMPL = {
 #: 这样，所以方法栏要同时写清"顶点模型精确"和"时刻含余量"。
 GROUND_IMPL = {
     "sphere": ("collide_sphere_ground", "sphere_ground_toi", "精确", "一元一次方程"),
-    "box": ("collide_box_ground", "hull_ground_toi", "一阶", "顶点模型纯平移精确；返回值含 200 µm 余量，无保守保证"),
-    "hull": ("collide_hull_ground", "hull_ground_toi", "一阶", "顶点模型纯平移精确；返回值含 200 µm 余量，无保守保证"),
+    "box": ("collide_box_ground", "hull_ground_toi", "保守", "纯平移顶点解；自转支撑高度 + 角动量速度上界，含 200 µm 余量"),
+    "hull": ("collide_hull_ground", "hull_ground_toi", "保守", "纯平移顶点解；自转支撑高度 + 角动量速度上界，含 200 µm 余量"),
     "cylinder": ("collide_cylinder_ground", "curved_ground_toi", "保守", "端面圆周最低点 + 自转上界"),
     "capsule": ("collide_capsule_ground", "curved_ground_toi", "保守", "端球最低点 + 自转上界"),
     # 参数化曲面体没有专属地面函数：它们统一走 collide_convex_ground——支撑特征
